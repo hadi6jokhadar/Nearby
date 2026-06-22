@@ -34,6 +34,8 @@ Single `package.json` — no separate frontend/backend packages.
 
 ### Development
 
+**Prerequisites:** Node.js 20+, npm 9+
+
 ```
 npm run dev
 ```
@@ -43,12 +45,22 @@ Starts Vite dev server (port 3000) + Electron simultaneously. DevTools open auto
 ### Production build
 
 ```
-npm run dist:win      # Windows NSIS installer
-npm run dist:mac      # macOS DMG
-npm run dist:linux    # Linux AppImage
+npm run dist:win      # Windows NSIS installer  (unsigned, local only)
+npm run dist:mac      # macOS DMG               (unsigned, local only)
+npm run dist:linux    # Linux AppImage           (local only)
 ```
 
-Output lands in `release/`.
+For a **signed + notarized** macOS build use `build.mjs` directly:
+
+```bash
+export APPLE_ID="..."
+export APPLE_APP_SPECIFIC_PASSWORD="..."
+export APPLE_TEAM_ID="..."
+export GH_TOKEN="..."
+node build.mjs --mac --publish
+```
+
+Output lands in `release/`. Configuration lives in `electron-builder.config.js` (passed explicitly via `--config` to avoid electron-builder v24 config-discovery issues).
 
 > **Before rebuilding:** close the running Nearby app first (tray → Close Nearby), otherwise electron-builder can't overwrite the DLLs in `release\win-unpacked`.
 
@@ -515,6 +527,53 @@ A native OS menu bar is shown above the window (always visible on macOS; visible
 ```
 
 Server assigns colors round-robin from this list. On disconnect the color slot is freed (last color popped off `usedColors`).
+
+---
+
+## Code signing and notarization
+
+### macOS — Developer ID + Notarization
+
+The macOS DMG is signed with an **Apple Developer ID Application** certificate and notarized via Apple's notary service so Gatekeeper accepts it without any warning.
+
+**Key files:**
+
+| File | Purpose |
+|------|---------|
+| `electron-builder.config.js` | electron-builder config (JS so `APPLE_TEAM_ID` env var can be read at build time) |
+| `entitlements.mac.plist` | Hardened runtime entitlements: JIT, unsigned executable memory, network client |
+
+**How signing works:**
+
+electron-builder v24 has built-in notarization support. Setting `notarize: { teamId }` in the mac config is enough — no separate `@electron/notarize` package needed. The config reads `APPLE_ID` and `APPLE_APP_SPECIFIC_PASSWORD` from env vars automatically.
+
+The `--config electron-builder.config.js` flag is passed explicitly to all `electron-builder` calls (both in `build.mjs` and in the GitHub Actions workflow) to bypass electron-builder v24's config-file discovery, which failed to auto-detect the JS config file.
+
+**Verification:**
+
+```bash
+hdiutil attach Nearby-X.Y.Z-arm64.dmg
+xcrun stapler validate "/Volumes/Nearby X.Y.Z-arm64/Nearby.app"   # → The validate action worked!
+spctl --assess --verbose "/Volumes/Nearby X.Y.Z-arm64/Nearby.app" # → accepted (source=Notarized Developer ID)
+```
+
+### Windows — SignPath
+
+Windows installer signing is handled by [SignPath](https://signpath.io) via GitHub Actions. The unsigned NSIS installer is submitted to SignPath, signed, and re-uploaded to GitHub Releases. Configured in `.github/workflows/release.yml`.
+
+### CI/CD — GitHub Actions
+
+Both platforms build and publish in parallel on every `v*` tag push. Required secrets:
+
+| Secret | Used by |
+|--------|---------|
+| `APPLE_CERTIFICATE` | base64-encoded `.p12` Developer ID cert |
+| `APPLE_CERTIFICATE_PASSWORD` | `.p12` export password |
+| `APPLE_ID` | Apple ID email for notarization |
+| `APPLE_APP_SPECIFIC_PASSWORD` | App-specific password from appleid.apple.com |
+| `APPLE_TEAM_ID` | 10-char Team ID from developer.apple.com |
+| `GH_TOKEN` | GitHub token for publishing releases |
+| `SIGNPATH_API_TOKEN` | SignPath signing API token |
 
 ---
 

@@ -132,7 +132,7 @@ A native OS menu bar is shown above the window (always visible on macOS; visible
 
 ## Dev mode
 
-**Prerequisites:** Node.js 18+, npm 9+
+**Prerequisites:** Node.js 20+, npm 9+
 
 ```bash
 npm install
@@ -148,7 +148,6 @@ Starts Vite on `http://localhost:3000` (React hot reload) and Electron pointing 
 ## Building the installer
 
 ```bash
-npm run dist        # current platform
 npm run dist:win    # Windows (.exe NSIS installer)
 npm run dist:mac    # macOS (.dmg)  — must run on macOS
 npm run dist:linux  # Linux (.AppImage)
@@ -156,13 +155,54 @@ npm run dist:linux  # Linux (.AppImage)
 
 Output lands in `./release/`.
 
+For a signed and published release use `build.mjs` directly (see **Releasing** below).
+
 ### Icons
 
-Place files in `./assets/` before building:
+Place files in `src/assets/` before building:
 
-- `assets/icon.ico` — Windows (256×256)
-- `assets/icon.icns` — macOS
-- `assets/icon.png` — Linux (512×512)
+- `src/assets/Nearby.ico` — Windows
+- `src/assets/Nearby.icns` — macOS
+- `src/assets/Nearby.png` — Linux (512×512)
+
+---
+
+## Releasing
+
+Releases are built, signed, and published by `build.mjs`.
+
+### Windows
+
+Runs on any OS. Signing is handled by SignPath via GitHub Actions — push a `v*` tag to trigger it.
+
+### macOS (must run on a Mac)
+
+Requires an [Apple Developer account](https://developer.apple.com) and a **Developer ID Application** certificate in your Keychain.
+
+```bash
+export APPLE_ID="you@example.com"
+export APPLE_APP_SPECIFIC_PASSWORD="xxxx-xxxx-xxxx-xxxx"   # appleid.apple.com → App-Specific Passwords
+export APPLE_TEAM_ID="XXXXXXXXXX"                           # developer.apple.com → Membership
+export GH_TOKEN="ghp_..."
+
+node build.mjs --mac --publish
+```
+
+This builds the DMG, signs it with your Developer ID certificate, submits it to Apple for notarization, staples the ticket, and uploads to GitHub Releases. Users see no Gatekeeper warning.
+
+### Via GitHub Actions (both platforms)
+
+Push a version tag — both jobs run in parallel:
+
+```bash
+# bump version in package.json first, then:
+git add package.json package-lock.json
+git commit -m "chore: bump to vX.Y.Z"
+git tag vX.Y.Z
+git push origin master --tags
+```
+
+Required GitHub secrets: `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`, `GH_TOKEN`, `SIGNPATH_API_TOKEN`.
 
 ---
 
