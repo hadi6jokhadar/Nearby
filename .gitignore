@@ -3,3 +3,11 @@ dist/
 release/
 *.log
 .DS_Store
+
+# secrets — never commit these
+.env
+.env.*
+*.pfx
+*.p12
+*.pem
+*.key
