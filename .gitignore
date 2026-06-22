@@ -5,6 +5,7 @@ release/
 .DS_Store
 
 # secrets — never commit these
+comands.txt
 .env
 .env.*
 *.pfx
