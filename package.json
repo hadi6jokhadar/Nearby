@@ -31,54 +31,5 @@
     "react-dom": "^18.3.1",
     "vite": "^5.4.2",
     "wait-on": "^7.2.0"
-  },
-  "build": {
-    "appId": "com.yousale.nearby",
-    "productName": "Nearby",
-    "files": [
-      "electron.js",
-      "server.js",
-      "preload.js",
-      "logger.js",
-      "dist/**/*"
-    ],
-    "directories": {
-      "output": "release"
-    },
-    "win": {
-      "target": "nsis",
-      "icon": "src/assets/Nearby.ico"
-    },
-    "afterSign": "notarize.cjs",
-    "mac": {
-      "target": "dmg",
-      "icon": "src/assets/Nearby.icns",
-      "hardenedRuntime": true,
-      "gatekeeperAssess": false,
-      "entitlements": "entitlements.mac.plist",
-      "entitlementsInherit": "entitlements.mac.plist",
-      "protocols": {
-        "name": "nearby",
-        "schemes": [
-          "nearby"
-        ]
-      }
-    },
-    "linux": {
-      "target": "AppImage",
-      "icon": "src/assets/Nearby.png"
-    },
-    "protocols": {
-      "name": "nearby",
-      "schemes": [
-        "nearby"
-      ]
-    },
-    "publish": {
-      "provider": "github",
-      "owner": "hadi6jokhadar",
-      "repo": "Nearby",
-      "releaseType": "release"
-    }
   }
 }
