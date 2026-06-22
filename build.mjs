@@ -85,9 +85,14 @@ function resolveGHToken() {
 if (wantPublish) {
   const token = resolveGHToken();
   if (!token) {
-    fail('GH_TOKEN not found in process env or Windows user environment.');
-    fail('Add it via: Start → "Edit environment variables" → New → GH_TOKEN');
-    fail('Then open a new terminal, or set it inline:  $env:GH_TOKEN = "ghp_..."');
+    fail('GH_TOKEN not found in process env.');
+    if (platform() === 'win32') {
+      fail('Add it via: Start → "Edit environment variables" → New → GH_TOKEN');
+      fail('Then open a new terminal, or set it inline:  $env:GH_TOKEN = "ghp_..."');
+    } else {
+      fail('Set it for this session:  export GH_TOKEN=ghp_...');
+      fail('Or persist it in ~/.zshrc / ~/.bashrc:  echo \'export GH_TOKEN=ghp_...\' >> ~/.zshrc');
+    }
     process.exit(1);
   }
   process.env.GH_TOKEN = token; // make it available to electron-builder subprocess
