@@ -3,26 +3,31 @@
  * build.mjs — Production build script for Nearby.
  *
  * Usage:
- *   node build.mjs          → Windows only  (works on any OS)
- *   node build.mjs --all    → Windows + macOS  (macOS build requires running on a Mac)
- *   node build.mjs --mac    → macOS only  (must run on macOS)
- *   node build.mjs --win    → Windows only
+ *   node build.mjs                   → Windows only  (works on any OS)
+ *   node build.mjs --all             → Windows + macOS  (macOS build requires running on a Mac)
+ *   node build.mjs --mac             → macOS only  (must run on macOS)
+ *   node build.mjs --win             → Windows only
+ *   node build.mjs --win --publish   → build + upload to GitHub Releases (requires GH_TOKEN)
  *
  * Output: release/
  */
 
-import { execSync }             from 'child_process';
-import { rmSync, existsSync }   from 'fs';
-import { join }                 from 'path';
-import { fileURLToPath }        from 'url';
-import { platform }             from 'os';
-import { performance }          from 'perf_hooks';
+import { execSync }               from 'child_process';
+import { rmSync, existsSync, readFileSync } from 'fs';
+import { join }                   from 'path';
+import { fileURLToPath }          from 'url';
+import { platform }               from 'os';
+import { performance }            from 'perf_hooks';
 
 const ROOT    = fileURLToPath(new URL('.', import.meta.url));
+const pkg     = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf-8'));
+const VERSION = pkg.version;
 const IS_MAC  = platform() === 'darwin';
-const args    = process.argv.slice(2);
-const wantMac = args.includes('--mac') || args.includes('--all');
-const wantWin = args.includes('--win') || args.includes('--all') || args.length === 0;
+const args         = process.argv.slice(2);
+const wantPublish  = args.includes('--publish');
+const platformArgs = args.filter((a) => a !== '--publish');
+const wantMac      = platformArgs.includes('--mac') || platformArgs.includes('--all');
+const wantWin      = platformArgs.includes('--win') || platformArgs.includes('--all') || platformArgs.length === 0;
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -64,7 +69,9 @@ if (wantMac && !IS_MAC) {
 }
 
 process.stdout.write('\n\x1b[1mNearby — production build\x1b[0m\n');
-process.stdout.write(`Platform: ${platform()} | Targets: ${[wantWin && 'win', wantMac && 'mac'].filter(Boolean).join(' + ')}\n`);
+process.stdout.write(`Platform : ${platform()}\n`);
+process.stdout.write(`Targets  : ${[wantWin && 'win', wantMac && 'mac'].filter(Boolean).join(' + ')}\n`);
+process.stdout.write(`Publish  : ${wantPublish ? 'yes → GitHub Releases' : 'no (local only)'}\n`);
 
 // ─── clean ────────────────────────────────────────────────────────────────────
 
@@ -81,8 +88,9 @@ const total = performance.now();
 
 run('npm run build', 'Vite — compile renderer');
 
-if (wantWin) run('npx electron-builder --win', 'Electron-builder — Windows (.exe NSIS)');
-if (wantMac) run('npx electron-builder --mac', 'Electron-builder — macOS (.dmg)');
+const publishFlag = wantPublish ? ' --publish always' : '';
+if (wantWin) run(`npx electron-builder --win${publishFlag}`, 'Electron-builder — Windows (.exe NSIS)');
+if (wantMac) run(`npx electron-builder --mac${publishFlag}`, 'Electron-builder — macOS (.dmg)');
 
 // ─── summary ──────────────────────────────────────────────────────────────────
 
@@ -91,10 +99,7 @@ const elapsed = ((performance.now() - total) / 1000).toFixed(1);
 process.stdout.write(`\n\x1b[1m\x1b[32m✓ Build complete\x1b[0m in ${elapsed}s\n`);
 process.stdout.write(`  Output → \x1b[4mrelease/\x1b[0m\n\n`);
 
-if (wantWin) {
-  process.stdout.write('  Windows : release/Nearby Setup 1.0.0.exe\n');
-}
-if (wantMac) {
-  process.stdout.write('  macOS   : release/Nearby-1.0.0.dmg\n');
-}
+if (wantWin) process.stdout.write(`  Windows : release/Nearby Setup ${VERSION}.exe\n`);
+if (wantMac) process.stdout.write(`  macOS   : release/Nearby-${VERSION}.dmg\n`);
+if (wantPublish) process.stdout.write(`  GitHub  : https://github.com/${pkg.build?.publish?.owner}/${pkg.build?.publish?.repo}/releases/tag/v${VERSION}\n`);
 process.stdout.write('\n');
