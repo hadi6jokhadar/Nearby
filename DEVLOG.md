@@ -105,7 +105,7 @@ Every member runs this same stack:
 │  App.jsx                                    │
 │    └─ SetupView  or  WidgetView             │
 │         └─ useWebSocket.js                  │
-│              └─ WebSocket to localhost:993  │  ← role=host (relay winner)
+│              └─ WebSocket to localhost:4993 │  ← role=host (relay winner)
 │              └─ WebSocket to wss://loca.lt  │  ← role=guest (all others)
 └─────────────────────────────────────────────┘
 ```
@@ -115,7 +115,7 @@ Every member runs this same stack:
 ### Two windows
 
 - **Setup window**: 420×520, framed, normal. Shows on first launch or after reset.
-- **Widget window**: 90px wide, frameless, transparent, always-on-top, no taskbar entry. Shows after team is created/joined.
+- **Widget window**: 172px wide, frameless, transparent, always-on-top, no taskbar entry. Shows after team is created/joined.
 
 These are separate `BrowserWindow` instances. Switching between them is done via IPC (`open-widget`, `open-setup`). The outgoing window is closed with `setImmediate(() => win.close())` to avoid a race where the renderer is destroyed before the IPC reply is sent back.
 
@@ -221,7 +221,7 @@ Right-click the tray icon:
 - **Reset team…** / **Leave team** — confirmation dialog, then sends `tray-action: 'reset'` to the renderer which calls `sendReset()` → `deleteState()` → `openSetup()`
 - **Open DevTools** — detached DevTools for the active window
 - **View log file** — opens `nearby.log` in the default text editor
-- **Close Orbs** — `app.quit()`
+- **Close Nearby** — `app.quit()`
 
 ---
 
