@@ -1,0 +1,78 @@
+{
+  "name": "nearby",
+  "version": "1.0.0",
+  "description": "Floating team presence widget — no cloud required",
+  "main": "electron.js",
+  "private": true,
+  "author": "Hady Joukhadar <m_cuhadar@yousale.com>",
+  "license": "MIT",
+  "scripts": {
+    "dev": "concurrently \"vite\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development electron .\"",
+    "build": "vite build",
+    "dist": "npm run build && electron-builder",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:linux": "npm run build && electron-builder --linux"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9",
+    "localtunnel": "^2.0.2",
+    "uuid": "^9.0.1",
+    "ws": "^8.17.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3",
+    "electron": "^31.3.1",
+    "electron-builder": "^24.13.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "vite": "^5.4.2",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.yousale.nearby",
+    "productName": "Nearby",
+    "files": [
+      "electron.js",
+      "server.js",
+      "preload.js",
+      "logger.js",
+      "dist/**/*"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/icon.icns",
+      "protocols": {
+        "name": "nearby",
+        "schemes": [
+          "nearby"
+        ]
+      }
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "assets/icon.png"
+    },
+    "protocols": {
+      "name": "nearby",
+      "schemes": [
+        "nearby"
+      ]
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "YOUR_GITHUB_USERNAME",
+      "repo": "nearby",
+      "releaseType": "release"
+    }
+  }
+}

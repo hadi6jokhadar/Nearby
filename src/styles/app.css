@@ -1,0 +1,593 @@
+/* ─── Reset & base ──────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* Prevent the frameless widget window from ever showing scrollbars */
+html, body { overflow: hidden; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+
+/* ─── Loading screen ────────────────────────────────────────────────────────── */
+.loading-screen {
+  width: 100vw;
+  height: 100vh;
+  background: transparent;
+}
+
+/* ─── Setup view ────────────────────────────────────────────────────────────── */
+.setup-container {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px 28px 24px;
+  background: var(--bg-setup, #f8f8f8);
+  color: var(--text-primary, #111);
+}
+
+@media (prefers-color-scheme: dark) {
+  .setup-container {
+    --bg-setup: #1c1c1e;
+    --text-primary: #f5f5f5;
+    --input-bg: #2c2c2e;
+    --input-border: rgba(255,255,255,0.12);
+    --btn-bg: #3a3a3c;
+    --tab-active-bg: #3a3a3c;
+  }
+}
+
+.setup-logo {
+  margin-bottom: 12px;
+}
+.setup-logo-orb {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #7F77DD 0%, #D4537E 100%);
+  box-shadow: 0 4px 16px rgba(127,119,221,0.4);
+}
+.setup-title {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  margin-bottom: 4px;
+}
+.setup-subtitle {
+  font-size: 12px;
+  opacity: 0.5;
+  margin-bottom: 24px;
+}
+
+.setup-tabs {
+  display: flex;
+  gap: 0;
+  border: 1px solid rgba(0,0,0,0.12);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 20px;
+  width: 100%;
+}
+@media (prefers-color-scheme: dark) {
+  .setup-tabs { border-color: rgba(255,255,255,0.12); }
+}
+.setup-tab {
+  flex: 1;
+  padding: 8px 0;
+  font-size: 13px;
+  font-weight: 500;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  opacity: 0.5;
+  transition: background 0.15s, opacity 0.15s;
+}
+.setup-tab.active {
+  background: rgba(127,119,221,0.12);
+  opacity: 1;
+  color: #7F77DD;
+}
+
+.setup-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+.setup-label {
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.6;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 6px;
+}
+.setup-input {
+  width: 100%;
+  padding: 9px 12px;
+  font-size: 14px;
+  border-radius: 7px;
+  border: 1px solid rgba(0,0,0,0.12);
+  background: rgba(0,0,0,0.03);
+  color: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.setup-input:focus { border-color: #7F77DD; }
+@media (prefers-color-scheme: dark) {
+  .setup-input {
+    border-color: rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.05);
+  }
+}
+.setup-error {
+  font-size: 12px;
+  color: #E24B4A;
+  margin-top: 4px;
+}
+.setup-btn {
+  margin-top: 12px;
+  padding: 11px 0;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: none;
+  background: #7F77DD;
+  color: #fff;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.setup-btn:hover { opacity: 0.88; }
+.setup-btn:disabled { opacity: 0.5; cursor: default; }
+
+/* ─── Widget container ──────────────────────────────────────────────────────── */
+.widget-container {
+  width: 160px;
+  min-height: 200px;
+  padding: 10px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 14px;
+  border: 1px solid rgba(0,0,0,0.08);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+
+  /* Make the whole widget draggable except interactive elements */
+  -webkit-app-region: drag;
+  user-select: none;
+}
+@media (prefers-color-scheme: dark) {
+  .widget-container {
+    background: rgba(28,28,30,0.92);
+    border-color: rgba(255,255,255,0.08);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+  }
+}
+
+/* ─── Peer circle ───────────────────────────────────────────────────────────── */
+.peer-circle-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  animation: fadeIn 0.2s ease;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.peer-ring {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2.5px solid;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.4s ease, box-shadow 0.4s ease;
+}
+.peer-ring.online  { border-color: #22c55e; }
+.peer-ring.offline { border-color: #9ca3af; }
+.peer-ring.paired  {
+  border-color: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34,197,94,0.2);
+}
+
+/* Disconnected self: pulse animation */
+.peer-ring.self-disconnected {
+  animation: pulse 1.8s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.45; }
+}
+
+.peer-inner {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--peer-color, #888780);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.peer-name {
+  font-size: 9px;
+  text-align: center;
+  max-width: 64px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #333;
+}
+@media (prefers-color-scheme: dark) {
+  .peer-name { color: #ddd; }
+}
+.peer-name.offline-label { opacity: 0.45; }
+.peer-name.self-label    { font-weight: 600; }
+
+/* ─── Paired badge ──────────────────────────────────────────────────────────── */
+.paired-badge {
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: #22c55e;
+  background: rgba(34,197,94,0.1);
+  border-radius: 4px;
+  padding: 1px 5px;
+  -webkit-app-region: no-drag;
+}
+
+/* ─── Divider ───────────────────────────────────────────────────────────────── */
+.widget-divider {
+  width: 100%;
+  height: 1px;
+  background: rgba(0,0,0,0.07);
+  margin: 3px 0;
+}
+@media (prefers-color-scheme: dark) {
+  .widget-divider { background: rgba(255,255,255,0.08); }
+}
+
+/* ─── Pair card ─────────────────────────────────────────────────────────────── */
+.pair-card {
+  width: 100%;
+  border-radius: 10px;
+  padding: 6px 6px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  animation: fadeIn 0.2s ease;
+}
+.pair-card.working-with {
+  background: rgba(29,158,117,0.08);
+  color: #1D9E75;
+}
+.pair-card.waiting-for {
+  background: rgba(186,117,23,0.08);
+  color: #BA7517;
+}
+@media (prefers-color-scheme: dark) {
+  .pair-card.working-with { background: rgba(45,186,143,0.1); color: #2dba8f; }
+  .pair-card.waiting-for  { background: rgba(212,162,64,0.1);  color: #d4a240; }
+}
+
+.pair-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  width: 100%;
+  gap: 0;
+}
+
+/* Narrow the name label when inside a pair card so both fit side-by-side */
+.pair-row .peer-name {
+  max-width: 52px;
+}
+
+.pair-line {
+  flex: 1;
+  min-width: 6px;
+  height: 1.5px;
+  border-radius: 1px;
+  background: currentColor;
+  opacity: 0.25;
+  align-self: flex-start;
+  margin-top: 24px; /* aligns with the vertical center of the 48px ring */
+  margin-left: 3px;
+  margin-right: 3px;
+}
+
+.pair-label {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: inherit;
+  opacity: 0.6;
+}
+
+/* ─── Settings ──────────────────────────────────────────────────────────────── */
+.settings-btn {
+  background: none;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+  opacity: 0.45;
+  padding: 2px;
+  line-height: 1;
+  -webkit-app-region: no-drag;
+  transition: opacity 0.15s;
+}
+.settings-btn:hover { opacity: 0.85; }
+
+.settings-popover {
+  width: 200px;
+  position: absolute;
+  right: 92px;    /* appears to the left of the widget */
+  bottom: 48px;
+  background: rgba(255,255,255,0.97);
+  border: 1px solid rgba(0,0,0,0.1);
+  border-radius: 10px;
+  padding: 10px 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  font-size: 11px;
+  z-index: 100;
+  -webkit-app-region: no-drag;
+}
+@media (prefers-color-scheme: dark) {
+  .settings-popover {
+    background: rgba(44,44,46,0.97);
+    border-color: rgba(255,255,255,0.1);
+    color: #f0f0f0;
+  }
+}
+.settings-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.settings-label { font-weight: 600; opacity: 0.55; }
+.settings-value { font-size: 11px; word-break: break-all; text-align: right; }
+
+.settings-invite {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(0,0,0,0.07);
+}
+@media (prefers-color-scheme: dark) {
+  .settings-invite { border-top-color: rgba(255,255,255,0.07); }
+}
+.invite-link-text {
+  font-size: 9px;
+  word-break: break-all;
+  opacity: 0.6;
+  line-height: 1.4;
+}
+.copy-btn {
+  padding: 4px 8px;
+  font-size: 11px;
+  border-radius: 5px;
+  border: 1px solid rgba(0,0,0,0.12);
+  background: transparent;
+  cursor: pointer;
+  align-self: flex-start;
+  -webkit-app-region: no-drag;
+  color: inherit;
+}
+.copy-btn:hover { background: rgba(127,119,221,0.1); border-color: #7F77DD; color: #7F77DD; }
+@media (prefers-color-scheme: dark) {
+  .copy-btn { border-color: rgba(255,255,255,0.15); }
+}
+
+/* ─── Copy link button (widget, host only) ──────────────────────────────────── */
+.copy-link-btn {
+  width: 100%;
+  max-width: 144px;
+  font-size: 9px;
+  font-weight: 600;
+  padding: 4px 0;
+  border-radius: 6px;
+  border: 1px solid rgba(127,119,221,0.35);
+  background: rgba(127,119,221,0.08);
+  color: #7F77DD;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.copy-link-btn:hover {
+  background: rgba(127,119,221,0.18);
+  border-color: rgba(127,119,221,0.6);
+}
+@media (prefers-color-scheme: dark) {
+  .copy-link-btn { color: #a9a4f5; border-color: rgba(169,164,245,0.3); background: rgba(169,164,245,0.08); }
+  .copy-link-btn:hover { background: rgba(169,164,245,0.18); }
+}
+
+/* ─── Reconnect banner (widget, guest only) ─────────────────────────────────── */
+.reconnect-banner {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+.reconnect-msg {
+  font-size: 8.5px;
+  color: #888;
+  text-align: center;
+  margin: 0;
+  line-height: 1.4;
+}
+.reconnect-input {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 8.5px;
+  padding: 4px 6px;
+  border-radius: 5px;
+  border: 1px solid rgba(127,119,221,0.3);
+  background: rgba(127,119,221,0.06);
+  color: inherit;
+  outline: none;
+}
+.reconnect-input:focus { border-color: #7F77DD; }
+.reconnect-error { font-size: 8px; color: #E24B4A; margin: 0; }
+.reconnect-btn {
+  width: 100%;
+  font-size: 8.5px;
+  font-weight: 600;
+  padding: 4px 0;
+  border-radius: 5px;
+  border: 1px solid rgba(127,119,221,0.35);
+  background: rgba(127,119,221,0.08);
+  color: #7F77DD;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.reconnect-btn:hover { background: rgba(127,119,221,0.18); }
+@media (prefers-color-scheme: dark) {
+  .reconnect-msg { color: #aaa; }
+  .reconnect-input { border-color: rgba(169,164,245,0.25); background: rgba(169,164,245,0.07); }
+  .reconnect-btn { color: #a9a4f5; border-color: rgba(169,164,245,0.3); background: rgba(169,164,245,0.08); }
+  .reconnect-btn:hover { background: rgba(169,164,245,0.18); }
+}
+
+/* ─── Reset button ──────────────────────────────────────────────────────────── */
+.reset-btn {
+  font-size: 9px;
+  padding: 3px 8px;
+  border-radius: 5px;
+  border: 1px solid rgba(226,75,74,0.35);
+  background: transparent;
+  color: #E24B4A;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  transition: background 0.15s;
+}
+.reset-btn:hover { background: rgba(226,75,74,0.08); }
+.reset-btn.disabled {
+  opacity: 0.35;
+  border-color: #9ca3af;
+  color: #9ca3af;
+  cursor: default;
+}
+
+.reset-confirm {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;          /* stay inside the 66px widget content box */
+  -webkit-app-region: no-drag;
+}
+.reset-confirm-text {
+  font-size: 9px;
+  opacity: 0.7;
+  text-align: center;
+  width: 100%;
+  word-break: break-word;
+  white-space: normal;
+  line-height: 1.4;
+}
+.confirm-yes {
+  font-size: 9px;
+  padding: 3px 10px;
+  background: #E24B4A;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.confirm-no {
+  font-size: 9px;
+  padding: 3px 10px;
+  border: 1px solid rgba(0,0,0,0.15);
+  background: transparent;
+  border-radius: 5px;
+  cursor: pointer;
+  color: inherit;
+}
+
+/* ─── Relationship pill ─────────────────────────────────────────────────────── */
+.relationship-pill {
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  padding: 1px 5px;
+  border-radius: 6px;
+  margin-top: 1px;
+  max-width: 64px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.relationship-pill.working {
+  background: rgba(29,158,117,0.14);
+  color: #1D9E75;
+}
+.relationship-pill.waiting {
+  background: rgba(186,117,23,0.14);
+  color: #BA7517;
+}
+@media (prefers-color-scheme: dark) {
+  .relationship-pill.working { background: rgba(45,186,143,0.16); color: #2dba8f; }
+  .relationship-pill.waiting { background: rgba(212,162,64,0.16);  color: #d4a240; }
+}
+
+/* ─── Relationship popover ──────────────────────────────────────────────────── */
+.relationship-popover {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 3px 0;
+}
+.popover-option {
+  font-size: 9px;
+  font-weight: 500;
+  padding: 4px 6px;
+  border: 1px solid rgba(0,0,0,0.1);
+  border-radius: 5px;
+  background: rgba(0,0,0,0.04);
+  color: inherit;
+  cursor: pointer;
+  text-align: center;
+  -webkit-app-region: no-drag;
+  transition: background 0.12s, border-color 0.12s;
+}
+.popover-option:hover {
+  background: rgba(127,119,221,0.12);
+  border-color: rgba(127,119,221,0.35);
+}
+.popover-option.active {
+  background: rgba(127,119,221,0.18);
+  border-color: rgba(127,119,221,0.5);
+  color: #7F77DD;
+}
+@media (prefers-color-scheme: dark) {
+  .popover-option {
+    border-color: rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.05);
+  }
+  .popover-option:hover  { background: rgba(169,164,245,0.15); border-color: rgba(169,164,245,0.4); }
+  .popover-option.active { background: rgba(169,164,245,0.2);  border-color: rgba(169,164,245,0.55); color: #a9a4f5; }
+}
+
+/* Utility: prevent dragging on any interactive element */
+button, input, a, .no-drag { -webkit-app-region: no-drag; }
