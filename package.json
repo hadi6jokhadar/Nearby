@@ -1,6 +1,6 @@
 {
   "name": "nearby",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Floating team presence widget — no cloud required",
   "main": "electron.js",
   "private": true,
@@ -28,7 +28,7 @@
     "electron": "^31.3.1",
     "electron-builder": "^24.13.3",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "react-dom": "^18.3.112wa2EWA\u0002w|Qq  q 1 1 ",
     "vite": "^5.4.2",
     "wait-on": "^7.2.0"
   }
