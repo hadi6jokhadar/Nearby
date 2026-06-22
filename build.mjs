@@ -59,6 +59,40 @@ function run(cmd, label) {
   }
 }
 
+// ─── GH_TOKEN ─────────────────────────────────────────────────────────────────
+// process.env only contains variables that were present when this terminal
+// session started. If GH_TOKEN was added to Windows user environment after
+// the terminal opened, we read it directly from the registry so the user
+// never has to restart their terminal or set it manually per-session.
+
+function resolveGHToken() {
+  if (process.env.GH_TOKEN) return process.env.GH_TOKEN;
+
+  if (platform() === 'win32') {
+    try {
+      const out = execSync('reg query "HKCU\\Environment" /v GH_TOKEN 2>nul', {
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      const match = out.match(/GH_TOKEN\s+REG_SZ\s+(.+)/);
+      if (match) return match[1].trim();
+    } catch {}
+  }
+
+  return null;
+}
+
+if (wantPublish) {
+  const token = resolveGHToken();
+  if (!token) {
+    fail('GH_TOKEN not found in process env or Windows user environment.');
+    fail('Add it via: Start → "Edit environment variables" → New → GH_TOKEN');
+    fail('Then open a new terminal, or set it inline:  $env:GH_TOKEN = "ghp_..."');
+    process.exit(1);
+  }
+  process.env.GH_TOKEN = token; // make it available to electron-builder subprocess
+}
+
 // ─── preflight ────────────────────────────────────────────────────────────────
 
 if (wantMac && !IS_MAC) {
