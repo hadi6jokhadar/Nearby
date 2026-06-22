@@ -1,23 +1,23 @@
 // App.jsx — Root component. Hydrates state from disk on mount and routes between views.
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from "react";
 
 function channelSubdomain(channelId) {
-  return 'nearby-' + channelId.replace(/-/g, '').slice(0, 12);
+  return "nearby-" + channelId.replace(/-/g, "").slice(0, 12);
 }
-import SetupView from './views/SetupView.jsx';
-import WidgetView from './views/WidgetView.jsx';
-import { getState, setState, subscribe } from './store/state.js';
+import SetupView from "./views/SetupView.jsx";
+import WidgetView from "./views/WidgetView.jsx";
+import { getState, setState, subscribe } from "./store/state.js";
 
 export default function App() {
-  const [view, setView] = useState('loading');
+  const [view, setView] = useState("loading");
 
   useEffect(() => {
     async function hydrate() {
       const saved = await window.electronAPI.readState();
       if (!saved?.self) {
-        setState({ view: 'setup' });
-        setView('setup');
+        setState({ view: "setup" });
+        setView("setup");
         return;
       }
 
@@ -32,16 +32,18 @@ export default function App() {
 
       let updatedSelf;
       if (result.ok && result.tunnelUrl && result.subdomainHonored) {
-        const wsUrl = result.tunnelUrl.replace(/^https:\/\//, 'wss://').replace(/^http:\/\//, 'ws://');
-        updatedSelf = { ...saved.self, role: 'host', wsUrl, port };
+        const wsUrl = result.tunnelUrl
+          .replace(/^https:\/\//, "wss://")
+          .replace(/^http:\/\//, "ws://");
+        updatedSelf = { ...saved.self, role: "host", wsUrl, port };
       } else if (result.ok && result.tunnelUrl && !result.subdomainHonored) {
         // Lost the race — relay is already up, connect as guest.
-        updatedSelf = { ...saved.self, role: 'guest', wsUrl: deterministicUrl };
+        updatedSelf = { ...saved.self, role: "guest", wsUrl: deterministicUrl };
       } else {
         // Tunnel not yet available (timeout) or server start failed.
         // Hosts fall back to local IP so teammates on the same network can join immediately.
         // Guests keep their stored wsUrl (local IP or loca.lt from the invite link they used).
-        if (saved.self.role === 'host') {
+        if (saved.self.role === "host") {
           const localIP = await window.electronAPI.getLocalIP();
           updatedSelf = { ...saved.self, wsUrl: `ws://${localIP}:${port}` };
         } else {
@@ -59,9 +61,9 @@ export default function App() {
         self: updatedSelf,
         peers: (saved.peers || []).map((p) => ({ ...p, online: false })),
         relationships: saved.relationships || [],
-        view: 'widget',
+        view: "widget",
       });
-      setView('widget');
+      setView("widget");
     }
     hydrate();
 
@@ -70,19 +72,19 @@ export default function App() {
     return unsub;
   }, []);
 
-  if (view === 'loading') {
+  if (view === "loading") {
     return <div className="loading-screen" />;
   }
 
-  if (view === 'setup') {
-    return <SetupView onComplete={() => setView('widget')} />;
+  if (view === "setup") {
+    return <SetupView onComplete={() => setView("widget")} />;
   }
 
   return (
     <WidgetView
       onReset={() => {
-        setState({ view: 'setup' });
-        setView('setup');
+        setState({ view: "setup" });
+        setView("setup");
       }}
     />
   );
