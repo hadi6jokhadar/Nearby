@@ -251,6 +251,25 @@ function updateTrayMenu() {
 
   const items = [];
 
+  if (widgetWindow) {
+    const visible = widgetWindow.isVisible() && !widgetWindow.isMinimized();
+    items.push({
+      label: visible ? 'Hide widget' : 'Show widget',
+      click() {
+        if (!widgetWindow) return;
+        if (widgetWindow.isMinimized()) widgetWindow.restore();
+        if (widgetWindow.isVisible()) {
+          widgetWindow.hide();
+        } else {
+          widgetWindow.show();
+          widgetWindow.focus();
+        }
+        updateTrayMenu();
+      },
+    });
+    items.push({ type: 'separator' });
+  }
+
   if (inviteLink) {
     items.push({
       label: 'Copy invite link',
@@ -323,6 +342,13 @@ function updateTrayMenu() {
   items.push({
     label: 'View log file',
     click() { shell.openPath(LOG_FILE); },
+  });
+  items.push({ type: 'separator' });
+  items.push({
+    label: 'Launch at startup',
+    type: 'checkbox',
+    checked: app.getLoginItemSettings().openAtLogin,
+    click(item) { app.setLoginItemSettings({ openAtLogin: item.checked }); },
   });
   items.push({ type: 'separator' });
   items.push({ label: 'Close Nearby', click() { app.quit(); } });
@@ -541,6 +567,12 @@ ipcMain.handle('get-deep-link', () => {
 
 ipcMain.handle('update-tray', updateTrayMenu);
 
+ipcMain.handle('get-login-item', () => app.getLoginItemSettings().openAtLogin);
+ipcMain.handle('set-login-item', (_, enable) => {
+  app.setLoginItemSettings({ openAtLogin: enable });
+  updateTrayMenu();
+});
+
 // Renderer sends log lines here; they land in the same nearby.log file
 ipcMain.handle('log', (_, ctx, msg) => { log(ctx, msg); });
 
@@ -574,6 +606,8 @@ function openWidgetWindow() {
     widgetWindow.show();
     createTray();
   });
+  widgetWindow.on('show', updateTrayMenu);
+  widgetWindow.on('hide', updateTrayMenu);
   widgetWindow.on('closed', () => {
     widgetWindow = null;
     destroyTray();

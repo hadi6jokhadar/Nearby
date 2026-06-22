@@ -33,6 +33,7 @@ function channelSubdomain(channelId) {
 export function useWebSocket({ onReset } = {}) {
   const wsRef = useRef(null);
   const reconnectTimerRef = useRef(null);
+  const connectTimeoutRef = useRef(null);
   const pingTimerRef = useRef(null);
   const presenceTimerRef = useRef(null);
   const syncTimerRef = useRef(null);
@@ -275,10 +276,23 @@ export function useWebSocket({ onReset } = {}) {
 
     if (!url) { rlog('ERROR: url is empty/null — cannot connect'); return; }
 
+    clearTimeout(connectTimeoutRef.current);
     const ws = new WebSocket(url);
     wsRef.current = ws;
 
+    // loca.lt can silently stall a WebSocket upgrade for 10+ seconds before
+    // returning 1006. This 8s hard timeout aborts the stalled socket and
+    // immediately triggers the onclose → takeover / reconnect path so the
+    // guestUnreachable banner appears quickly and the next attempt starts sooner.
+    connectTimeoutRef.current = setTimeout(() => {
+      if (ws.readyState === WebSocket.CONNECTING) {
+        rlog('connect timeout (8s) — aborting stalled connection');
+        ws.close();
+      }
+    }, 8_000);
+
     ws.onopen = () => {
+      clearTimeout(connectTimeoutRef.current);
       rlog(`connected OK to ${url}`);
       isAttemptingTakeover.current = false;
       hostFailCountRef.current  = 0;

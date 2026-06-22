@@ -47,6 +47,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Let the renderer tell the main process to refresh the tray menu labels
   updateTray:   ()       => ipcRenderer.invoke('update-tray'),
 
+  // Launch at system startup
+  getLoginItem: ()         => ipcRenderer.invoke('get-login-item'),
+  setLoginItem: (enable)   => ipcRenderer.invoke('set-login-item', enable),
+
   // Write a log line into the main-process nearby.log file
   log: (ctx, msg)        => ipcRenderer.invoke('log', ctx, msg),
 });
