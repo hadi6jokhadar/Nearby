@@ -1,0 +1,56 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'   # triggers on: git tag v1.0.1 && git push --tags
+
+jobs:
+  build-sign-publish:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build renderer + package installer (unsigned)
+        run: npx electron-builder --win
+        env:
+          # Prevent electron-builder from trying to publish before signing
+          EP_DRAFT: true
+
+      - name: Sign installer with SignPath
+        uses: SignPath/github-actions-submit-signing-request@v1.1
+        with:
+          api-token:              ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id:        ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug:           nearby
+          signing-policy-slug:    release-signing
+          artifact-configuration-slug: windows-installer
+          github-artifact-id:     unsigned-installer
+          wait-for-completion:    true
+          output-artifact-directory: release/signed
+
+      - name: Upload signed installer to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/signed/Nearby Setup*.exe
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Generate latest.yml for auto-updater
+        run: npx electron-builder --win --publish always
+        env:
+          GH_TOKEN:      ${{ secrets.GH_TOKEN }}
+          # Point builder at the already-uploaded signed exe so it only
+          # generates the metadata file without re-packaging
+          SKIP_BUILD:    true
