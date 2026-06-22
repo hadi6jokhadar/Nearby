@@ -43,7 +43,7 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID:               ${{ secrets.APPLE_TEAM_ID }}
           GH_TOKEN:                    ${{ secrets.GH_TOKEN }}
-        run: npx electron-builder --mac --publish always
+        run: npx electron-builder --mac --config electron-builder.config.js --publish always
 
   build-sign-publish:
     runs-on: windows-latest
@@ -60,7 +60,7 @@ jobs:
         run: npm ci
 
       - name: Build renderer + package installer (unsigned)
-        run: npx electron-builder --win
+        run: npx electron-builder --win --config electron-builder.config.js
         env:
           # Prevent electron-builder from trying to publish before signing
           EP_DRAFT: true
@@ -87,7 +87,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Generate latest.yml for auto-updater
-        run: npx electron-builder --win --publish always
+        run: npx electron-builder --win --config electron-builder.config.js --publish always
         env:
           GH_TOKEN:      ${{ secrets.GH_TOKEN }}
           # Point builder at the already-uploaded signed exe so it only

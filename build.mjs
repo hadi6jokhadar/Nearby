@@ -128,8 +128,9 @@ const total = performance.now();
 run('npm run build', 'Vite — compile renderer');
 
 const publishFlag = wantPublish ? ' --publish always' : '';
-if (wantWin) run(`npx electron-builder --win${publishFlag}`, 'Electron-builder — Windows (.exe NSIS)');
-if (wantMac) run(`npx electron-builder --mac${publishFlag}`, 'Electron-builder — macOS (.dmg)');
+const configFlag = ' --config electron-builder.config.js';
+if (wantWin) run(`npx electron-builder --win${configFlag}${publishFlag}`, 'Electron-builder — Windows (.exe NSIS)');
+if (wantMac) run(`npx electron-builder --mac${configFlag}${publishFlag}`, 'Electron-builder — macOS (.dmg)');
 
 // ─── summary ──────────────────────────────────────────────────────────────────
 
