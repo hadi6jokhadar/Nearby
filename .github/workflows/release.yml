@@ -6,6 +6,45 @@ on:
       - 'v*'   # triggers on: git tag v1.0.1 && git push --tags
 
 jobs:
+  build-sign-publish-mac:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Import Apple Developer certificate into temporary keychain
+        env:
+          APPLE_CERTIFICATE:          ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain"
+          CERT_PATH="$RUNNER_TEMP/cert.p12"
+
+          echo "$APPLE_CERTIFICATE" | base64 --decode -o "$CERT_PATH"
+
+          security create-keychain -p "ci-password" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "ci-password" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -k "$KEYCHAIN_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security list-keychains -d user -s "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -k "ci-password" "$KEYCHAIN_PATH"
+
+      - name: Build, sign, notarize, and publish macOS DMG
+        env:
+          APPLE_ID:                    ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID:               ${{ secrets.APPLE_TEAM_ID }}
+          GH_TOKEN:                    ${{ secrets.GH_TOKEN }}
+        run: npx electron-builder --mac --publish always
+
   build-sign-publish:
     runs-on: windows-latest
 
