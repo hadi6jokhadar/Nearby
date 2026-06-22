@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+
+  <nsis-file>
+    <binary-name>Nearby Setup*.exe</binary-name>
+
+    <!-- Sign the inner Electron app binary -->
+    <pe-file path="resources/app.asar.unpacked/**/*.exe">
+      <authenticode-sign/>
+    </pe-file>
+
+    <!-- Sign the main Electron executable -->
+    <pe-file path="Nearby.exe">
+      <authenticode-sign/>
+    </pe-file>
+
+    <!-- Sign the installer itself -->
+    <authenticode-sign/>
+  </nsis-file>
+
+</artifact-configuration>

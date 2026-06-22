@@ -46,11 +46,11 @@
     },
     "win": {
       "target": "nsis",
-      "icon": "assets/icon.ico"
+      "icon": "src/assets/Nearby.ico"
     },
     "mac": {
       "target": "dmg",
-      "icon": "assets/icon.icns",
+      "icon": "src/assets/Nearby.icns",
       "protocols": {
         "name": "nearby",
         "schemes": [
@@ -60,7 +60,7 @@
     },
     "linux": {
       "target": "AppImage",
-      "icon": "assets/icon.png"
+      "icon": "src/assets/Nearby.png"
     },
     "protocols": {
       "name": "nearby",
