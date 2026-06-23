@@ -15,7 +15,8 @@
     "dist:linux": "npm run build && electron-builder --linux",
     "release": "node release.mjs",
     "release:minor": "node release.mjs minor",
-    "release:major": "node release.mjs major"
+    "release:major": "node release.mjs major",
+    "release:retag": "node release.mjs --retag"
   },
   "dependencies": {
     "electron-updater": "^6.8.9",

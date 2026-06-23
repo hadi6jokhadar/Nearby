@@ -10,6 +10,7 @@
  *   node release.mjs minor      → minor bump  (1.0.2 → 1.1.0)
  *   node release.mjs major      → major bump  (1.0.2 → 2.0.0)
  *   node release.mjs 1.2.3      → exact version
+ *   node release.mjs --retag    → re-release current version (move tag to HEAD)
  *   node release.mjs --yes      → skip confirmation prompt
  */
 
@@ -53,17 +54,18 @@ function bumpVersion(current, arg) {
 
 // ── parse args ───────────────────────────────────────────────────────────────
 
-const args      = process.argv.slice(2).filter(a => a !== '--yes');
+const args       = process.argv.slice(2).filter(a => a !== '--yes' && a !== '--retag');
 const skipPrompt = process.argv.includes('--yes');
-const bumpArg   = args[0];  // 'minor' | 'major' | '1.2.3' | undefined
+const retag      = process.argv.includes('--retag');
+const bumpArg    = args[0];  // 'minor' | 'major' | '1.2.3' | undefined
 
 // ── preflight ────────────────────────────────────────────────────────────────
 
 const pkg        = JSON.parse(readFileSync(PKG_PATH, 'utf-8'));
 const oldVersion = pkg.version;
-const newVersion = bumpVersion(oldVersion, bumpArg);
+const newVersion = retag ? oldVersion : bumpVersion(oldVersion, bumpArg);
 
-if (oldVersion === newVersion) fail(`Already at version ${oldVersion}.`);
+if (!retag && oldVersion === newVersion) fail(`Already at version ${oldVersion}. Use --retag to re-release it.`);
 
 // Abort if working tree is dirty (package.json excluded — we'll update it)
 const dirty = run('git status --porcelain')
@@ -83,8 +85,13 @@ if (branch !== 'master') {
 // ── confirm ──────────────────────────────────────────────────────────────────
 
 process.stdout.write(`\n\x1b[1mNearby — release\x1b[0m\n`);
-process.stdout.write(`\n  ${oldVersion}  →  \x1b[1;32mv${newVersion}\x1b[0m\n`);
-process.stdout.write(`\n  Will commit, tag, and push — GitHub Actions builds + signs + publishes.\n`);
+if (retag) {
+  process.stdout.write(`\n  Re-releasing \x1b[1;32mv${newVersion}\x1b[0m (moving tag to HEAD)\n`);
+  process.stdout.write(`\n  Will overwrite the existing tag and re-trigger CI.\n`);
+} else {
+  process.stdout.write(`\n  ${oldVersion}  →  \x1b[1;32mv${newVersion}\x1b[0m\n`);
+  process.stdout.write(`\n  Will commit, tag, and push — GitHub Actions builds + signs + publishes.\n`);
+}
 
 if (!skipPrompt) {
   const answer = await prompt('\n  Continue? [Y/n] ');
@@ -94,19 +101,18 @@ if (!skipPrompt) {
   }
 }
 
-// ── bump version ─────────────────────────────────────────────────────────────
+// ── bump version (skipped for --retag) ───────────────────────────────────────
 
-step('Bumping version');
-// npm version updates both package.json and package-lock.json cleanly
-run(`npm version ${newVersion} --no-git-tag-version`, false);
-ok(`package.json + package-lock.json → ${newVersion}`);
+if (!retag) {
+  step('Bumping version');
+  run(`npm version ${newVersion} --no-git-tag-version`, false);
+  ok(`package.json + package-lock.json → ${newVersion}`);
 
-// ── commit ───────────────────────────────────────────────────────────────────
-
-step('Committing');
-run('git add package.json package-lock.json');
-run(`git commit -m "chore: bump to v${newVersion}"`);
-ok(`chore: bump to v${newVersion}`);
+  step('Committing');
+  run('git add package.json package-lock.json');
+  run(`git commit -m "chore: bump to v${newVersion}"`);
+  ok(`chore: bump to v${newVersion}`);
+}
 
 // ── tag ──────────────────────────────────────────────────────────────────────
 
