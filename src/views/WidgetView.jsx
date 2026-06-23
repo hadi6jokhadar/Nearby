@@ -46,10 +46,17 @@ export default function WidgetView({ onReset }) {
   const [newLink, setNewLink] = useState('');
   const [linkError, setLinkError] = useState('');
   const [tunnelReady, setTunnelReady] = useState(false);
+  const [updateState, setUpdateState] = useState('idle');
 
   useEffect(() => {
     const unsub = subscribe(setAppState);
     return unsub;
+  }, []);
+
+  useEffect(() => {
+    window.electronAPI.getUpdateState().then(setUpdateState);
+    const fn = window.electronAPI.onUpdateState(setUpdateState);
+    return () => window.electronAPI.offUpdateState(fn);
   }, []);
 
   // Track public tunnel status and upgrade wsUrl to the public URL when tunnel connects.
@@ -314,6 +321,20 @@ export default function WidgetView({ onReset }) {
             {linkError && <p className="reconnect-error">{linkError}</p>}
             <button className="reconnect-btn" onClick={handleRelink}>Reconnect</button>
           </div>
+        </>
+      )}
+
+      {/* Update button — hidden when up to date */}
+      {(updateState === 'downloading' || updateState === 'ready') && (
+        <>
+          <div className="widget-divider" />
+          <button
+            className={`update-btn no-drag${updateState === 'ready' ? ' update-btn-ready' : ''}`}
+            disabled={updateState === 'downloading'}
+            onClick={updateState === 'ready' ? () => window.electronAPI.installUpdate() : undefined}
+          >
+            {updateState === 'downloading' ? '↓ Downloading update…' : '↑ Restart to update'}
+          </button>
         </>
       )}
     </div>

@@ -589,5 +589,40 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
   .popover-option.active { background: rgba(169,164,245,0.2);  border-color: rgba(169,164,245,0.55); color: #a9a4f5; }
 }
 
+/* ─── Update button (widget) ─────────────────────────────────────────────────── */
+.update-btn {
+  width: 100%;
+  max-width: 144px;
+  font-size: 9px;
+  font-weight: 600;
+  padding: 4px 0;
+  border-radius: 6px;
+  border: 1px solid rgba(127,119,221,0.3);
+  background: rgba(127,119,221,0.06);
+  color: #7F77DD;
+  cursor: default;
+  opacity: 0.65;
+  -webkit-app-region: no-drag;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+}
+.update-btn.update-btn-ready {
+  opacity: 1;
+  cursor: pointer;
+  border-color: rgba(127,119,221,0.5);
+  background: rgba(127,119,221,0.1);
+}
+.update-btn.update-btn-ready:hover {
+  background: rgba(127,119,221,0.2);
+  border-color: rgba(127,119,221,0.7);
+}
+@media (prefers-color-scheme: dark) {
+  .update-btn { color: #a9a4f5; border-color: rgba(169,164,245,0.25); background: rgba(169,164,245,0.06); }
+  .update-btn.update-btn-ready { border-color: rgba(169,164,245,0.45); background: rgba(169,164,245,0.1); }
+  .update-btn.update-btn-ready:hover { background: rgba(169,164,245,0.2); border-color: rgba(169,164,245,0.65); }
+}
+
 /* Utility: prevent dragging on any interactive element */
 button, input, a, .no-drag { -webkit-app-region: no-drag; }

@@ -567,6 +567,9 @@ ipcMain.handle('get-deep-link', () => {
 
 ipcMain.handle('update-tray', updateTrayMenu);
 
+ipcMain.handle('get-update-state', () => updateState);
+ipcMain.handle('install-update', () => { autoUpdater.quitAndInstall(); });
+
 ipcMain.handle('get-login-item', () => app.getLoginItemSettings().openAtLogin);
 ipcMain.handle('set-login-item', (_, enable) => {
   app.setLoginItemSettings({ openAtLogin: enable });
@@ -738,28 +741,36 @@ function buildAppMenu() {
 
 // ─── Auto-updater ─────────────────────────────────────────────────────────────
 
+function sendUpdateStateToRenderer() {
+  const win = widgetWindow || setupWindow;
+  if (win && !win.isDestroyed()) win.webContents.send('update-state-changed', updateState);
+}
+
 function setupAutoUpdater() {
   if (IS_DEV) return; // updater only works in packaged builds
 
   autoUpdater.autoDownload    = true;  // download silently in background
-  autoUpdater.autoInstallOnAppQuit = true; // install on next quit if user picks "Later"
+  autoUpdater.autoInstallOnAppQuit = true; // install on quit if user dismisses the in-app button
 
   autoUpdater.on('checking-for-update', () => {
     log('updater', 'Checking for update…');
     updateState = 'checking';
     updateTrayMenu();
+    sendUpdateStateToRenderer();
   });
 
   autoUpdater.on('update-available', (info) => {
     log('updater', `Update available: ${info.version}`);
     updateState = 'downloading';
     updateTrayMenu();
+    sendUpdateStateToRenderer();
   });
 
   autoUpdater.on('update-not-available', () => {
     log('updater', 'App is up to date.');
     updateState = 'idle';
     updateTrayMenu();
+    sendUpdateStateToRenderer();
   });
 
   autoUpdater.on('download-progress', (progress) => {
@@ -770,24 +781,14 @@ function setupAutoUpdater() {
     log('updater', `Update downloaded: ${info.version}`);
     updateState = 'ready';
     updateTrayMenu();
-
-    const win = widgetWindow || setupWindow;
-    const choice = dialog.showMessageBoxSync(win || null, {
-      type: 'info',
-      title: 'Update ready',
-      message: `Nearby ${info.version} has been downloaded`,
-      detail: 'Restart now to apply the update, or install it automatically on next close.',
-      buttons: ['Restart now', 'Later'],
-      defaultId: 0,
-      cancelId: 1,
-    });
-    if (choice === 0) autoUpdater.quitAndInstall();
+    sendUpdateStateToRenderer();
   });
 
   autoUpdater.on('error', (err) => {
     log('updater', `Update error: ${err.message}`);
     updateState = 'idle';
     updateTrayMenu();
+    sendUpdateStateToRenderer();
   });
 
   // Silent check 10 s after startup so it doesn't compete with tunnel setup.

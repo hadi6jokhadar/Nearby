@@ -53,4 +53,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Write a log line into the main-process nearby.log file
   log: (ctx, msg)        => ipcRenderer.invoke('log', ctx, msg),
+
+  // In-app update button
+  getUpdateState:    ()     => ipcRenderer.invoke('get-update-state'),
+  installUpdate:     ()     => ipcRenderer.invoke('install-update'),
+  onUpdateState:     (cb)   => { const fn = (_, state) => cb(state); ipcRenderer.on('update-state-changed', fn); return fn; },
+  offUpdateState:    (fn)   => ipcRenderer.removeListener('update-state-changed', fn),
 });
