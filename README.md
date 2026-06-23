@@ -169,42 +169,37 @@ Place files in `src/assets/` before building:
 
 ## Releasing
 
-Releases are built, signed, and published by `build.mjs`.
-
-### Windows
-
-Runs on any OS. Signing is handled by SignPath via GitHub Actions — push a `v*` tag to trigger it.
-
-### macOS (must run on a Mac)
-
-Requires an [Apple Developer account](https://developer.apple.com) and a **Developer ID Application** certificate in your Keychain.
+Use `release.mjs` to ship a new version in one command. It bumps the version, commits, tags, and pushes — GitHub Actions then builds, signs, and publishes both the Windows installer and the macOS DMG automatically.
 
 ```bash
-export APPLE_ID="you@example.com"
-export APPLE_APP_SPECIFIC_PASSWORD="xxxx-xxxx-xxxx-xxxx"   # appleid.apple.com → App-Specific Passwords
-export APPLE_TEAM_ID="XXXXXXXXXX"                           # developer.apple.com → Membership
-export GH_TOKEN="ghp_..."
-
-node build.mjs --mac --publish
+npm run release            # patch bump  (1.0.2 → 1.0.3)
+npm run release:minor      # minor bump  (1.0.2 → 1.1.0)
+npm run release:major      # major bump  (1.0.2 → 2.0.0)
+node release.mjs 1.5.0     # exact version
+node release.mjs --yes     # skip confirmation prompt
 ```
 
-This builds the DMG, signs it with your Developer ID certificate, submits it to Apple for notarization, staples the ticket, and uploads to GitHub Releases. Users see no Gatekeeper warning.
+The script checks for uncommitted changes, shows a confirmation prompt, then:
+1. Runs `npm version` to update `package.json` and `package-lock.json`
+2. Commits → tags `vX.Y.Z` → pushes master + tag
 
-### Via GitHub Actions (both platforms)
+GitHub Actions picks up the tag and runs two parallel jobs:
+- **macOS** — builds, signs with Developer ID, notarizes via Apple, publishes `.dmg`
+- **Windows** — builds unsigned, signs via SignPath (Authenticode), publishes `.exe` + `latest.yml`
 
-Push a version tag — both jobs run in parallel:
+### Logo / icons
 
-```bash
-# bump version in package.json first, then:
-git add package.json
-git commit -m "chore: bump to vX.Y.Z"
-git tag vX.Y.Z
-git push origin master --tags
-```
+Replace these files before releasing to update the app icon:
 
-Both jobs use the built-in `github.token` for publishing — no `GH_TOKEN` secret needed.
+| File | Platform |
+| ---- | -------- |
+| `src/assets/Nearby.ico` | Windows |
+| `src/assets/Nearby.icns` | macOS |
+| `src/assets/Nearby.png` | Linux (512×512) |
 
-Required GitHub secrets:
+### GitHub secrets required
+
+Both jobs use the built-in `github.token` for publishing — no personal access token needed.
 
 | Secret | Used by |
 | ------ | ------- |
@@ -215,7 +210,7 @@ Required GitHub secrets:
 | `APPLE_TEAM_ID` | macOS — 10-character team ID |
 | `SIGNPATH_API_TOKEN` | Windows — SignPath API token for Authenticode signing |
 
-Windows signing is handled by [SignPath](https://signpath.io) (free for open source). The signed installer and `latest.yml` (for auto-update) are published directly to the GitHub Release.
+Windows signing uses [SignPath](https://signpath.io) (free for open source). The signed installer and `latest.yml` (for `electron-updater` auto-update) are published directly to the GitHub Release.
 
 ---
 

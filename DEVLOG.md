@@ -578,6 +578,17 @@ Windows Authenticode signing is handled by [SignPath](https://signpath.io) (free
 
 Both platforms build and publish in parallel on every `v*` tag push. Publishing uses the built-in `github.token` — no personal access token needed.
 
+**Triggering a release** is done via `release.mjs`:
+
+```bash
+npm run release          # patch bump + push tag
+npm run release:minor    # minor bump + push tag
+npm run release:major    # major bump + push tag
+node release.mjs 1.2.3   # exact version
+```
+
+The script validates git state, bumps `package.json` + `package-lock.json` via `npm version`, commits, tags, and pushes. GitHub Actions triggers on the tag.
+
 Required secrets (Settings → Secrets and variables → Actions):
 
 | Secret | Used by |
