@@ -53,8 +53,7 @@ jobs:
   build-sign-publish:
     runs-on: windows-latest
     permissions:
-      id-token: write   # required for SignPath to verify the workflow run
-      contents: write   # required to publish GitHub Release assets
+      contents: write
 
     steps:
       - uses: actions/checkout@v4
@@ -73,25 +72,26 @@ jobs:
       - name: Package unsigned Windows installer
         run: npx electron-builder --win --config electron-builder.config.js --publish never
         env:
-          CSC_IDENTITY_AUTO_DISCOVERY: false   # skip any accidental local cert
-
-      - name: Upload unsigned installer as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: unsigned-installer
-          path: release/Nearby Setup*.exe
+          CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Sign installer with SignPath
-        uses: SignPath/github-actions-submit-signing-request@v1.1
-        with:
-          api-token:                   ${{ secrets.SIGNPATH_API_TOKEN }}
-          organization-id:             a819449d-c11d-486c-aa45-f028e771412d
-          project-slug:                nearby
-          signing-policy-slug:         test-release-signing
-          artifact-configuration-slug: initial
-          github-artifact-id:          unsigned-installer
-          wait-for-completion:         true
-          output-artifact-directory:   release/signed
+        shell: pwsh
+        env:
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+        run: |
+          Install-Module -Name SignPath -Repository PSGallery -Force -Scope CurrentUser
+          $unsigned = (Get-ChildItem "release" -Filter "*.exe" | Select-Object -First 1).FullName
+          New-Item -ItemType Directory -Force -Path "release/signed" | Out-Null
+          $signed = "release/signed/$((Get-Item $unsigned).Name)"
+          Submit-SigningRequest `
+            -InputArtifactPath  $unsigned `
+            -OutputArtifactPath $signed `
+            -ApiToken           $env:SIGNPATH_API_TOKEN `
+            -OrganizationId     "a819449d-c11d-486c-aa45-f028e771412d" `
+            -ProjectSlug        "nearby" `
+            -SigningPolicySlug  "test-release-signing" `
+            -ArtifactConfigurationSlug "initial" `
+            -WaitForCompletion
 
       - name: Generate latest.yml for auto-updater
         shell: pwsh
