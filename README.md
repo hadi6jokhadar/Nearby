@@ -196,13 +196,26 @@ Push a version tag — both jobs run in parallel:
 
 ```bash
 # bump version in package.json first, then:
-git add package.json package-lock.json
+git add package.json
 git commit -m "chore: bump to vX.Y.Z"
 git tag vX.Y.Z
 git push origin master --tags
 ```
 
-Required GitHub secrets: `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`, `GH_TOKEN`, `SIGNPATH_API_TOKEN`.
+Both jobs use the built-in `github.token` for publishing — no `GH_TOKEN` secret needed.
+
+Required GitHub secrets:
+
+| Secret | Used by |
+| ------ | ------- |
+| `APPLE_CERTIFICATE` | macOS — Developer ID cert (base64 p12) |
+| `APPLE_CERTIFICATE_PASSWORD` | macOS — p12 password |
+| `APPLE_ID` | macOS — notarization Apple ID |
+| `APPLE_APP_SPECIFIC_PASSWORD` | macOS — notarization app-specific password |
+| `APPLE_TEAM_ID` | macOS — 10-character team ID |
+| `SIGNPATH_API_TOKEN` | Windows — SignPath API token for Authenticode signing |
+
+Windows signing is handled by [SignPath](https://signpath.io) (free for open source). The signed installer and `latest.yml` (for auto-update) are published directly to the GitHub Release.
 
 ---
 

@@ -557,23 +557,37 @@ xcrun stapler validate "/Volumes/Nearby X.Y.Z-arm64/Nearby.app"   # → The vali
 spctl --assess --verbose "/Volumes/Nearby X.Y.Z-arm64/Nearby.app" # → accepted (source=Notarized Developer ID)
 ```
 
-### Windows — SignPath
+### Windows — SignPath (Authenticode)
 
-Windows installer signing is handled by [SignPath](https://signpath.io) via GitHub Actions. The unsigned NSIS installer is submitted to SignPath, signed, and re-uploaded to GitHub Releases. Configured in `.github/workflows/release.yml`.
+Windows Authenticode signing is handled by [SignPath](https://signpath.io) (free open-source plan) via their PowerShell module in GitHub Actions.
+
+**Flow:**
+1. electron-builder packages the unsigned NSIS installer (`CSC_IDENTITY_AUTO_DISCOVERY=false` skips any local cert).
+2. The PowerShell step installs the `SignPath` module from PSGallery and calls `Submit-SigningRequest`, which uploads the unsigned `.exe` to SignPath, waits for it to be signed, and writes the signed file to `release/signed/`.
+3. A second PowerShell step computes the SHA-512 of the signed exe and writes `latest.yml` (for `electron-updater` auto-update).
+4. `softprops/action-gh-release@v2` publishes both files to the GitHub Release.
+
+**SignPath project config:**
+- Organization ID: `a819449d-c11d-486c-aa45-f028e771412d`
+- Project slug: `nearby`
+- Signing policy slug: `test-release-signing`
+- Artifact configuration slug: `initial`
+- Artifact configuration file: `windows-installer.xml` (signs inner Nearby.exe, inner PE files, and the NSIS wrapper)
 
 ### CI/CD — GitHub Actions
 
-Both platforms build and publish in parallel on every `v*` tag push. Required secrets:
+Both platforms build and publish in parallel on every `v*` tag push. Publishing uses the built-in `github.token` — no personal access token needed.
+
+Required secrets (Settings → Secrets and variables → Actions):
 
 | Secret | Used by |
 |--------|---------|
-| `APPLE_CERTIFICATE` | base64-encoded `.p12` Developer ID cert |
-| `APPLE_CERTIFICATE_PASSWORD` | `.p12` export password |
-| `APPLE_ID` | Apple ID email for notarization |
-| `APPLE_APP_SPECIFIC_PASSWORD` | App-specific password from appleid.apple.com |
-| `APPLE_TEAM_ID` | 10-char Team ID from developer.apple.com |
-| `GH_TOKEN` | GitHub token for publishing releases |
-| `SIGNPATH_API_TOKEN` | SignPath signing API token |
+| `APPLE_CERTIFICATE` | macOS — base64-encoded `.p12` Developer ID cert |
+| `APPLE_CERTIFICATE_PASSWORD` | macOS — `.p12` export password |
+| `APPLE_ID` | macOS — Apple ID email for notarization |
+| `APPLE_APP_SPECIFIC_PASSWORD` | macOS — app-specific password from appleid.apple.com |
+| `APPLE_TEAM_ID` | macOS — 10-char Team ID from developer.apple.com |
+| `SIGNPATH_API_TOKEN` | Windows — SignPath API token for Authenticode signing |
 
 ---
 
