@@ -1,6 +1,6 @@
 {
   "name": "nearby",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Floating team presence widget — no cloud required",
   "main": "electron.js",
   "private": true,
