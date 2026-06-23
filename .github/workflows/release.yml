@@ -47,7 +47,7 @@ jobs:
           APPLE_ID:                    ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID:               ${{ secrets.APPLE_TEAM_ID }}
-          GH_TOKEN:                    ${{ secrets.GH_TOKEN }}
+          GH_TOKEN:                    ${{ github.token }}
         run: npx electron-builder --mac --config electron-builder.config.js --publish always
 
   build-sign-publish:
@@ -122,4 +122,4 @@ jobs:
             release/signed/latest.yml
           generate_release_notes: true
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
