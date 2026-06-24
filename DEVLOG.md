@@ -80,7 +80,7 @@ src/
   App.jsx            Root component — hydrates state from disk, routes views
   views/
     SetupView.jsx    First-launch screen: Create Team / Join Team tabs
-    WidgetView.jsx   Floating widget — peer circles, copy-link button, guest reconnect banner
+    WidgetView.jsx   Floating widget — normal (pair cards) and compact (pair-row) modes
   hooks/
     useWebSocket.js  WS lifecycle: connect, reconnect, PING, message dispatch
   store/
@@ -222,6 +222,9 @@ Every peer broadcasts a `SYNC_CHECK` every 5 seconds containing their highest `u
 | `onTrayAction(cb)`                            | Subscribe to tray menu actions (`'reset'`)                                                                                                                                                                                                                                                                                                                           |
 | `updateTray()`                                | Tell main process to rebuild the tray context menu                                                                                                                                                                                                                                                                                                                   |
 | `log(ctx, msg)`                               | Write a log line to `nearby.log` from the renderer                                                                                                                                                                                                                                                                                                                   |
+| `getWidgetMode()`                             | Return current widget mode (`'normal'` \| `'compact'`)                                                                                                                                                                                                                                                                                                               |
+| `onWidgetModeChanged(cb)` / `offWidgetModeChanged(token)` | Subscribe/unsubscribe to mode changes pushed from main when the tray or widget right-click menu toggles compact view                                                                                                                                                                                                                         |
+| `windowDragStart(x, y)` / `windowDragMove(x, y)` / `windowDragEnd()` | Fire-and-forget IPC for manual window dragging; replaces `-webkit-app-region: drag` so right-click is always a Chromium client-area event (see right-click bug below)                                                                                                                                                          |
 
 ---
 
@@ -599,6 +602,83 @@ Required secrets (Settings → Secrets and variables → Actions):
 | `APPLE_APP_SPECIFIC_PASSWORD` | macOS — app-specific password from appleid.apple.com |
 | `APPLE_TEAM_ID` | macOS — 10-char Team ID from developer.apple.com |
 | `SIGNPATH_API_TOKEN` | Windows — SignPath API token for Authenticode signing |
+
+### Widget right-click shows Windows system menu — then nothing (v1.0.5, seventh fix)
+
+**Symptoms (first issue):** Right-clicking anywhere on the floating widget showed the Windows native window menu (Restore, Move, Size, Minimize, Maximize, Close) instead of the custom context menu.
+
+**Symptom (second issue — introduced during first fix attempt):** After adding `onContextMenu={(e) => e.preventDefault()}` to the React container as a workaround, right-clicking produced no menu at all.
+
+**Root causes:**
+
+1. **`-webkit-app-region: drag` on `.widget-container`** — This CSS property causes Windows to classify those pixels as `HTCAPTION` (title bar area). Any right-click in that region becomes a `WM_NCRBUTTONUP` message routed directly to `DefWindowProc`, which shows the system window menu. Chromium never sees the click; `webContents.on('context-menu')` never fires. An attempted fix via `hookWindowMessage(WM_NCRBUTTONDOWN)` failed — the system menu is triggered on `UP`, not `DOWN`, and blocking `DOWN` has no effect.
+
+2. **`e.preventDefault()` on the DOM `contextmenu` event** — Calling `preventDefault()` on a React `contextmenu` handler cancels Chromium's internal context-menu IPC *before* it reaches `webContents.on('context-menu')` in the main process. The effect: no browser context menu AND no custom menu. Both are suppressed.
+
+**Fix (three files):**
+
+**`src/styles/app.css`**
+- Removed `-webkit-app-region: drag` from `.widget-container` entirely. Added `cursor: default` to keep the standard pointer. The whole window is now a Chromium client area — every right-click reaches `webContents.on('context-menu')`.
+
+**`electron.js`**
+- Removed all `hookWindowMessage` code. The single `webContents.on('context-menu')` handler now covers all right-clicks with no special cases.
+- Added IPC-based drag handlers (`window-drag-start`, `window-drag-move`, `window-drag-end`) using `ipcMain.on` (fire-and-forget). On `drag-start`, the widget's current OS position and the initial mouse screen position are captured. Each `drag-move` event recomputes `newX = originX + (mouseX - startMouseX)` and calls `win.setPosition`.
+
+**`preload.js`**
+- Added `windowDragStart(x, y)`, `windowDragMove(x, y)`, `windowDragEnd()` bridges using `ipcRenderer.send` (not `invoke`) — fire-and-forget so the hot `mousemove` path has no IPC round-trip latency.
+
+**`src/views/WidgetView.jsx`**
+- Added `startWindowDrag` callback: on left-button `mousedown` (skipping `button`, `input`, `a` targets), calls `windowDragStart` and attaches `mousemove`/`mouseup` listeners on `document`. Listeners are cleaned up on `mouseup`.
+- Removed `onContextMenu` from both widget container `<div>` elements — `webContents.on('context-menu')` implicitly replaces the browser default when it calls `popup()`.
+
+---
+
+### Dark mode: text and buttons invisible (v1.0.5)
+
+**Symptom:** With the OS set to dark mode, all widget text and button labels disappeared — dark text on a dark background.
+
+**Root cause:** The `.widget-container` dark mode `@media (prefers-color-scheme: dark)` block in `app.css` set `background` but never set `color`. All child elements use `color: inherit`, so they all inherited the browser default (`#000000`) — invisible against a dark background. The `.confirm-no` button's border was also invisible (defaulted to black).
+
+**Fix (`src/styles/app.css`):**
+- Added `color: #f0f0f0` to `.widget-container` inside the dark mode `@media` block.
+- Added `.confirm-no { border-color: rgba(255,255,255,0.18); }` inside dark mode.
+
+---
+
+### New feature: compact widget mode (v1.0.5)
+
+A second widget layout — toggled via right-click on the widget or tray icon (**Compact view** checkbox) — provides a narrow, dense at-a-glance view of the team.
+
+**Layout:**
+- Each active pair is shown as a single row: `[orb]──[connector]──[orb]`. The connector line is **green** (`#22c55e`) for *working_with* and **amber** (`#BA7517`) for *waiting_for*.
+- Self appears in pair rows alongside each partner, or as a solo orb row when unpaired.
+- Peer-to-peer pairs appear below a divider.
+- Solo peers (no active relationship) appear as a horizontal orb cluster — max 4 shown with a `+N` overflow label.
+- Clicking any peer orb expands an inline action panel: three full-width stacked buttons (**Working with / Waiting for / Clear**). Clicking a button sets the relationship and collapses back to compact.
+
+**Implementation:**
+
+**`electron.js`**
+- `widgetMode: 'normal' | 'compact'` module variable, loaded at startup from `config.json` (`app.getPath('userData')/config.json`) and saved on every toggle.
+- `buildMenuTemplate()` includes a `type: 'checkbox'` item for **Compact view** — toggles `widgetMode`, saves config, pushes `widget-mode-changed` IPC to the renderer, and calls `updateTrayMenu()` so both menus stay in sync.
+- `resize-widget` IPC uses a mode-aware minimum height: `64 px` in compact, `200 px` in normal.
+- New `get-widget-mode` IPC returns the current mode on renderer request.
+
+**`preload.js`**
+- `getWidgetMode()`, `onWidgetModeChanged(cb)` / `offWidgetModeChanged(token)` bridges.
+
+**`src/views/WidgetView.jsx`**
+- `widgetMode` state synced from `getWidgetMode()` on mount and `onWidgetModeChanged` events. Mode change clears `compactPopover` (closes any open action panel).
+- Shared layout computation block (`selfPairs`, `peerPairs`, `pairedPeerIds`, `soloPeers`) is placed before the compact/normal branch so both views use identical pairing logic.
+- Compact render uses `.compact-pair-row` rows with `.compact-connector` elements and a `renderCompactOrb` helper (32 px orb, no name label).
+- Auto-resize `useEffect` fires for both modes — no separate compact height IPC needed.
+
+**`src/styles/app.css`**
+- `.compact-pair-row` — full-width flex row, 4 px gap.
+- `.compact-connector` — `flex: 1`, 2 px tall; `.working_with` green, `.waiting_for` amber (dark mode variants included).
+- `.compact-orb` / `.compact-orb-inner` — 32 px borderless circle with status ring.
+- `.compact-solo-cluster` — wrapping flex row for unpaired peers.
+- `.compact-action-panel` — `flex-direction: column`, `align-items: stretch`; `.compact-action-btn` is `width: 100%` with comfortable tap padding.
 
 ---
 

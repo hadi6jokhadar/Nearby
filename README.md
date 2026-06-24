@@ -85,6 +85,15 @@ Click any peer circle to open an inline popover:
 
 Relationships are synced to all peers immediately and persisted to `state.json`.
 
+### Compact mode
+
+Right-click the widget (or the tray icon) and toggle **Compact view** to switch to a denser at-a-glance layout:
+
+- Each active pair is shown as a single row: two orbs connected by a colored line — **green** for *working with*, **amber** for *waiting for*.
+- Solo peers (no active relationship) appear as a small orb cluster below a divider.
+- Clicking any peer orb expands an inline action panel with three full-width stacked buttons (**Working with / Waiting for / Clear**). Clicking an action sets the relationship and collapses back to compact.
+- The mode preference is saved to `config.json` in the app data directory and restored on next launch.
+
 ### Reconnect banner
 
 When the relay is unreachable (shown after the 2nd consecutive connection failure), a banner appears:
@@ -110,6 +119,7 @@ Right-click the tray icon:
 | **Copy invite link** | Any member with a `channelId` | Copies the deterministic `nearby://join/…` link to clipboard |
 | **Reset team…** | Role is `host` (relay owner) | Confirmation dialog → sends `RESET` → all members return to setup |
 | **Leave team** | Role is `guest` | Same as Reset but for guests |
+| **Compact view** (checkbox) | Always, when widget is open | Toggles compact pair-row layout; preference saved to `config.json` |
 | **Open DevTools** | Always | Detached DevTools for the active window |
 | **View log file** | Always | Opens `nearby.log` in the default text editor |
 | **Close Nearby** | Always | `app.quit()` |
