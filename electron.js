@@ -45,12 +45,27 @@ let reacquireTimer      = null;
 let bgTunnelTimer       = null; // background tunnel retry after initial failure
 let startServerInFlight = null; // mutex for concurrent start-server IPC calls
 
-const STATE_FILE = path.join(app.getPath('userData'), 'state.json');
-const LOG_FILE   = path.join(app.getPath('userData'), 'nearby.log');
-const IS_DEV     = process.env.NODE_ENV === 'development';
+const STATE_FILE  = path.join(app.getPath('userData'), 'state.json');
+const CONFIG_FILE = path.join(app.getPath('userData'), 'config.json');
+const LOG_FILE    = path.join(app.getPath('userData'), 'nearby.log');
+const IS_DEV      = process.env.NODE_ENV === 'development';
 
 // 'idle' | 'checking' | 'available' | 'downloading' | 'ready'
 let updateState = 'idle';
+
+// 'normal' | 'compact'
+let widgetMode = 'normal';
+(function loadConfig() {
+  try {
+    if (fs.existsSync(CONFIG_FILE)) {
+      const cfg = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'));
+      if (cfg.widgetMode === 'compact') widgetMode = 'compact';
+    }
+  } catch {}
+})();
+function saveConfig() {
+  try { fs.writeFileSync(CONFIG_FILE, JSON.stringify({ widgetMode }, null, 2), 'utf-8'); } catch {}
+}
 
 // Start writing to the log file as early as possible
 setLogPath(LOG_FILE);
@@ -238,8 +253,7 @@ function scheduleBackgroundTunnel() {
   bgTunnelTimer = setTimeout(attempt, 15000);
 }
 
-function updateTrayMenu() {
-  if (!tray) return;
+function buildMenuTemplate() {
   const inviteLink = buildInviteLinkMain();
 
   let role = null;
@@ -351,9 +365,29 @@ function updateTrayMenu() {
     click(item) { app.setLoginItemSettings({ openAtLogin: item.checked }); },
   });
   items.push({ type: 'separator' });
+  items.push({
+    label: 'Compact view',
+    type: 'checkbox',
+    checked: widgetMode === 'compact',
+    click(item) {
+      widgetMode = item.checked ? 'compact' : 'normal';
+      saveConfig();
+      if (widgetWindow) {
+        widgetWindow.webContents.send('widget-mode-changed', widgetMode);
+        widgetWindow.setSize(172, 420); // renderer will resize down to fit content
+      }
+      updateTrayMenu();
+    },
+  });
+  items.push({ type: 'separator' });
   items.push({ label: 'Close Nearby', click() { app.quit(); } });
 
-  tray.setContextMenu(Menu.buildFromTemplate(items));
+  return items;
+}
+
+function updateTrayMenu() {
+  if (!tray) return;
+  tray.setContextMenu(Menu.buildFromTemplate(buildMenuTemplate()));
 }
 
 function createTray() {
@@ -541,8 +575,29 @@ ipcMain.handle('get-local-ip', () => {
 });
 
 ipcMain.handle('resize-widget', (_, height) => {
-  if (widgetWindow) widgetWindow.setSize(172, Math.max(200, Math.ceil(height)));
+  if (!widgetWindow) return;
+  const minH = widgetMode === 'compact' ? 64 : 200;
+  widgetWindow.setSize(172, Math.max(minH, Math.ceil(height)));
 });
+
+ipcMain.handle('get-widget-mode', () => widgetMode);
+
+// ─── IPC-based window drag (replaces -webkit-app-region: drag so that right-click
+//     is a plain client-area event and webContents 'context-menu' covers everything) ──
+let _dragStart = null;
+ipcMain.on('window-drag-start', (_, x, y) => {
+  if (!widgetWindow) return;
+  const [wx, wy] = widgetWindow.getPosition();
+  _dragStart = { mx: x, my: y, wx, wy };
+});
+ipcMain.on('window-drag-move', (_, x, y) => {
+  if (!widgetWindow || !_dragStart) return;
+  widgetWindow.setPosition(
+    _dragStart.wx + (x - _dragStart.mx),
+    _dragStart.wy + (y - _dragStart.my),
+  );
+});
+ipcMain.on('window-drag-end', () => { _dragStart = null; });
 
 ipcMain.handle('open-widget', () => {
   openWidgetWindow();
@@ -595,6 +650,7 @@ function openSetupWindow() {
 
 function openWidgetWindow() {
   if (widgetWindow) return;
+  log('main', 'openWidgetWindow: creating BrowserWindow');
   widgetWindow = new BrowserWindow({
     width: 172, height: 420,
     alwaysOnTop: true, frame: false, transparent: true,
@@ -605,7 +661,21 @@ function openWidgetWindow() {
   if (IS_DEV) widgetWindow.loadURL('http://localhost:3000');
   else widgetWindow.loadFile(path.join(__dirname, 'dist', 'index.html'));
 
+  widgetWindow.webContents.on('did-fail-load', (_, code, desc) => {
+    log('main', `widget renderer failed to load: ${code} ${desc}`);
+  });
+  widgetWindow.webContents.on('render-process-gone', (_, details) => {
+    log('main', `widget renderer process gone: reason=${details.reason} exitCode=${details.exitCode}`);
+  });
+
+  // Without -webkit-app-region: drag the whole window is a Chromium client area,
+  // so every right-click reaches this event handler reliably on all platforms.
+  widgetWindow.webContents.on('context-menu', (_, params) => {
+    Menu.buildFromTemplate(buildMenuTemplate()).popup({ window: widgetWindow, x: params.x, y: params.y });
+  });
+
   widgetWindow.on('ready-to-show', () => {
+    log('main', 'openWidgetWindow: ready-to-show — calling show()');
     widgetWindow.show();
     createTray();
   });
@@ -632,6 +702,7 @@ app.on('open-url', (event, url) => {
 
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
+  log('main', 'Another instance is already running — quitting.');
   app.quit();
 } else {
   app.on('second-instance', (_, argv) => {

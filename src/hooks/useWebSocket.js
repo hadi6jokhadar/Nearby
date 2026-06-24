@@ -40,10 +40,38 @@ export function useWebSocket({ onReset } = {}) {
   const isAttemptingTakeover = useRef(false);
   const hostFailCountRef  = useRef(0); // consecutive failed connects as host
   const guestFailCountRef = useRef(0); // consecutive failed connects as guest
+  const probeTimerRef = useRef(null);  // HTTP probe interval when relay is unreachable
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
   const rlog = (msg) => window.electronAPI?.log?.('ws', msg);
+
+  function stopRelayProbe() {
+    clearInterval(probeTimerRef.current);
+    probeTimerRef.current = null;
+  }
+
+  // Probe the loca.lt tunnel URL via HTTP every 5 s while disconnected.
+  // Any HTTP response (even 4xx/5xx) means the TCP route is open → trigger
+  // immediate WS reconnect, overriding any pending backoff timer.
+  function startRelayProbe(subdomain, connectFn) {
+    stopRelayProbe();
+    probeTimerRef.current = setInterval(async () => {
+      if (wsRef.current?.readyState === WebSocket.OPEN) { stopRelayProbe(); return; }
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 4_000);
+      try {
+        await fetch(`https://${subdomain}.loca.lt/`, { signal: ctrl.signal });
+        clearTimeout(t);
+        rlog(`relay probe OK (${subdomain}) — triggering immediate reconnect`);
+        stopRelayProbe();
+        clearTimeout(reconnectTimerRef.current);
+        if (!isAttemptingTakeover.current) connectFn();
+      } catch {
+        clearTimeout(t);
+      }
+    }, 5_000);
+  }
 
   const send = useCallback((msg) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
@@ -293,6 +321,7 @@ export function useWebSocket({ onReset } = {}) {
 
     ws.onopen = () => {
       clearTimeout(connectTimeoutRef.current);
+      stopRelayProbe();
       rlog(`connected OK to ${url}`);
       isAttemptingTakeover.current = false;
       hostFailCountRef.current  = 0;
@@ -356,12 +385,15 @@ export function useWebSocket({ onReset } = {}) {
         // held by the live relay) and we fall back to a normal 5 s reconnect. All guests
         // compete simultaneously; the first to win the subdomain becomes the new relay.
         guestFailCountRef.current += 1;
+        const selfSnap = stOnClose.self;
+        const subdomain = channelSubdomain(selfSnap.channelId);
         // Only show the "relay offline" banner after 2 consecutive failures so brief
         // network blips don't produce a jarring flash.
         if (guestFailCountRef.current >= 2) setState({ guestUnreachable: true });
+        // Background HTTP probe: fires every 5 s and triggers an immediate reconnect
+        // the moment loca.lt becomes reachable again, overriding the backoff timer.
+        startRelayProbe(subdomain, connect);
         isAttemptingTakeover.current = true;
-        const selfSnap = stOnClose.self;
-        const subdomain = channelSubdomain(selfSnap.channelId);
         rlog(`relay disconnected — immediate takeover attempt (subdomain=${subdomain})`);
 
         window.electronAPI.startServer(selfSnap.port || 4993, subdomain, 1).then((result) => {
@@ -376,13 +408,24 @@ export function useWebSocket({ onReset } = {}) {
             clearTimeout(reconnectTimerRef.current);
             connect();
           } else {
-            rlog(`takeover failed (subdomainHonored=${result.subdomainHonored}) — reconnecting as guest; will retry on next disconnect`);
-            reconnectTimerRef.current = setTimeout(connect, RECONNECT_INTERVAL_MS);
+            // Back off exponentially after the first 2 quick retries (which handle brief
+            // relay blips). Persistent unreachability (e.g. loca.lt routing broken for
+            // this user) would otherwise cause a tight 5 s loop that hammers loca.lt.
+            const failCount = guestFailCountRef.current;
+            const backoffMs = failCount <= 2
+              ? RECONNECT_INTERVAL_MS
+              : Math.min(RECONNECT_INTERVAL_MS * (failCount - 1), 60_000);
+            rlog(`takeover failed (subdomainHonored=${result.subdomainHonored}) — reconnecting as guest in ${backoffMs / 1000}s (fail #${failCount})`);
+            reconnectTimerRef.current = setTimeout(connect, backoffMs);
           }
         }).catch((err) => {
           isAttemptingTakeover.current = false;
           rlog(`relay takeover error: ${err.message}`);
-          reconnectTimerRef.current = setTimeout(connect, RECONNECT_INTERVAL_MS);
+          const failCount = guestFailCountRef.current;
+          const backoffMs = failCount <= 2
+            ? RECONNECT_INTERVAL_MS
+            : Math.min(RECONNECT_INTERVAL_MS * (failCount - 1), 60_000);
+          reconnectTimerRef.current = setTimeout(connect, backoffMs);
         });
         return; // wait for takeover result before scheduling any reconnect
       }
@@ -511,6 +554,7 @@ export function useWebSocket({ onReset } = {}) {
       clearInterval(pingTimerRef.current);
       clearInterval(presenceTimerRef.current);
       clearInterval(syncTimerRef.current);
+      clearInterval(probeTimerRef.current);
       if (wsRef.current) {
         wsRef.current.onclose = null; // prevent reconnect on intentional unmount
         wsRef.current.close();

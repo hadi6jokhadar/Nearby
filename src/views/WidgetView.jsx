@@ -2,7 +2,7 @@
 // Peers with active relationships appear side-by-side in pair cards.
 // Solo peers (no active relationship) are listed individually below.
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import PeerCircle from '../components/PeerCircle.jsx';
 import { getState, subscribe } from '../store/state.js';
 import { useWebSocket } from '../hooks/useWebSocket.js';
@@ -47,6 +47,24 @@ export default function WidgetView({ onReset }) {
   const [linkError, setLinkError] = useState('');
   const [tunnelReady, setTunnelReady] = useState(false);
   const [updateState, setUpdateState] = useState('idle');
+  const [widgetMode, setWidgetMode] = useState('normal');
+  const [compactPopover, setCompactPopover] = useState(null); // peerId in compact mode
+
+  // IPC-based window drag: replaces -webkit-app-region: drag so right-click is
+  // always a plain Chromium client-area event that reaches webContents 'context-menu'.
+  const startWindowDrag = useCallback((e) => {
+    if (e.button !== 0) return;
+    if (e.target.closest('button, input, a')) return;
+    window.electronAPI.windowDragStart(e.screenX, e.screenY);
+    const onMove = (mv) => window.electronAPI.windowDragMove(mv.screenX, mv.screenY);
+    const onEnd  = ()   => {
+      window.electronAPI.windowDragEnd();
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup',   onEnd);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup',   onEnd);
+  }, []);
 
   useEffect(() => {
     const unsub = subscribe(setAppState);
@@ -57,6 +75,15 @@ export default function WidgetView({ onReset }) {
     window.electronAPI.getUpdateState().then(setUpdateState);
     const fn = window.electronAPI.onUpdateState(setUpdateState);
     return () => window.electronAPI.offUpdateState(fn);
+  }, []);
+
+  useEffect(() => {
+    window.electronAPI.getWidgetMode().then(setWidgetMode);
+    const fn = window.electronAPI.onWidgetModeChanged((mode) => {
+      setWidgetMode(mode);
+      if (mode !== 'compact') setCompactPopover(null);
+    });
+    return () => window.electronAPI.offWidgetModeChanged(fn);
   }, []);
 
   // Track public tunnel status and upgrade wsUrl to the public URL when tunnel connects.
@@ -78,7 +105,7 @@ export default function WidgetView({ onReset }) {
   const { sendReset, sendRelationshipUpdate, reconnect } = useWebSocket({ onReset });
   const { self, peers, connected, relationships, guestUnreachable } = appState;
 
-  // Resize height to content
+  // Resize height to content (both normal and compact modes)
   useEffect(() => {
     if (!containerRef.current) return;
     window.electronAPI.resizeWidget(containerRef.current.scrollHeight + 16);
@@ -140,12 +167,10 @@ export default function WidgetView({ onReset }) {
 
   if (!self) return null;
 
-  // ── Layout sections ───────────────────────────────────────────────────────
-
+  // ── Shared layout computations (used by both normal and compact renders) ──
   const selfId = self.userId;
   const activeRels = (relationships || []).filter((r) => r.state);
 
-  // Pairs that include self
   const selfPairs = activeRels
     .filter((r) => r.userA === selfId || r.userB === selfId)
     .map((r) => ({
@@ -154,7 +179,6 @@ export default function WidgetView({ onReset }) {
     }))
     .filter((item) => item.partner);
 
-  // Pairs between other peers (neither is self)
   const peerPairs = activeRels
     .filter((r) => r.userA !== selfId && r.userB !== selfId)
     .map((r) => ({
@@ -164,7 +188,6 @@ export default function WidgetView({ onReset }) {
     }))
     .filter((item) => item.peerA && item.peerB);
 
-  // Peers not in any pair
   const pairedPeerIds = new Set([
     ...selfPairs.map((sp) => sp.partner.userId),
     ...peerPairs.flatMap((pp) => [pp.peerA.userId, pp.peerB.userId]),
@@ -176,6 +199,94 @@ export default function WidgetView({ onReset }) {
       return a.name.localeCompare(b.name);
     });
 
+  // ── Compact view ──────────────────────────────────────────────────────────
+  if (widgetMode === 'compact') {
+    const selfStatus = connected ? 'online' : (guestUnreachable ? 'relay-err' : 'offline');
+    const selfInitial = (self.name || '?')[0].toUpperCase();
+
+    const popoverPeer = compactPopover ? peers.find((p) => p.userId === compactPopover) : null;
+    const popoverRel  = popoverPeer ? getRelationship(selfId, popoverPeer.userId, relationships) : null;
+
+    // Render a compact orb (32px, no name label)
+    function renderCompactOrb(peer, isSelf, status, clickable) {
+      const initial = (peer.name || '?')[0].toUpperCase();
+      return (
+        <div
+          key={peer.userId}
+          className={`compact-orb ${status}${clickable ? ' clickable' : ''}${compactPopover === peer.userId ? ' selected' : ''}`}
+          style={{ '--peer-color': peer.color || '#888780' }}
+          title={isSelf ? peer.name + ' (you)' : peer.name}
+          onClick={clickable ? (e) => { e.stopPropagation(); setCompactPopover((p) => p === peer.userId ? null : peer.userId); } : undefined}
+        >
+          <div className="compact-orb-inner">{initial}</div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="widget-container compact" ref={containerRef} onMouseDown={startWindowDrag}>
+
+        {/* Self solo — shown when self has no active pair */}
+        {selfPairs.length === 0 && (
+          <div className="compact-pair-row">
+            {renderCompactOrb({ ...self, online: connected }, true, selfStatus, false)}
+          </div>
+        )}
+
+        {/* Self pair rows */}
+        {selfPairs.map(({ rel, partner }) => (
+          <div key={rel.id} className="compact-pair-row">
+            {renderCompactOrb({ ...self, online: connected }, true, selfStatus, false)}
+            <div className={`compact-connector ${rel.state}`} />
+            {renderCompactOrb(partner, false, partner.online !== false ? 'online' : 'offline', true)}
+          </div>
+        ))}
+
+        {/* Divider before peer pairs / solos */}
+        {(peerPairs.length > 0 || soloPeers.length > 0) && <div className="widget-divider" />}
+
+        {/* Peer-to-peer pair rows */}
+        {peerPairs.map(({ rel, peerA, peerB }) => (
+          <div key={rel.id} className="compact-pair-row">
+            {renderCompactOrb(peerA, false, peerA.online !== false ? 'online' : 'offline', false)}
+            <div className={`compact-connector ${rel.state}`} />
+            {renderCompactOrb(peerB, false, peerB.online !== false ? 'online' : 'offline', false)}
+          </div>
+        ))}
+
+        {/* Solo peers — horizontal mini-cluster */}
+        {soloPeers.length > 0 && (
+          <div className="compact-solo-cluster">
+            {soloPeers.slice(0, 4).map((peer) =>
+              renderCompactOrb(peer, false, peer.online !== false ? 'online' : 'offline', true)
+            )}
+            {soloPeers.length > 4 && <div className="compact-more">+{soloPeers.length - 4}</div>}
+          </div>
+        )}
+
+        {/* Inline action panel — expands when a peer orb is clicked */}
+        {popoverPeer && (
+          <div className="compact-action-panel">
+            <span className="compact-action-name">{popoverPeer.name}</span>
+            <button
+              className={`compact-action-btn${popoverRel?.state === 'working_with' ? ' active' : ''}`}
+              onClick={() => { handleSetRelationship(popoverPeer, 'working_with'); setCompactPopover(null); }}
+            >Working with</button>
+            <button
+              className={`compact-action-btn${popoverRel?.state === 'waiting_for' ? ' active' : ''}`}
+              onClick={() => { handleSetRelationship(popoverPeer, 'waiting_for'); setCompactPopover(null); }}
+            >Waiting for</button>
+            <button
+              className={`compact-action-btn${!popoverRel?.state ? ' active' : ''}`}
+              onClick={() => { handleSetRelationship(popoverPeer, null); setCompactPopover(null); }}
+            >Clear</button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Normal view layout ─────────────────────────────────────────────────────
   const hasPairsOrSolo = selfPairs.length > 0 || peerPairs.length > 0 || soloPeers.length > 0;
   const showCopyBtn = self.role === 'host' && !!buildInviteLink(self) && peers.length === 0;
 
@@ -218,6 +329,7 @@ export default function WidgetView({ onReset }) {
               isSelf={leftIsSelf}
               isPaired={false}
               relationship={null}
+              relayError={leftIsSelf && guestUnreachable}
               onClick={leftIsSelf ? () => {} : () => handlePeerClick(leftPeer)}
             />
             <div className="pair-line" />
@@ -256,7 +368,7 @@ export default function WidgetView({ onReset }) {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="widget-container" ref={containerRef}>
+    <div className="widget-container" ref={containerRef} onMouseDown={startWindowDrag}>
 
       {/* Self — solo if no active relationships, otherwise moves into pair cards */}
       {selfPairs.length === 0 && (
@@ -265,6 +377,7 @@ export default function WidgetView({ onReset }) {
           isSelf
           isPaired={false}
           relationship={null}
+          relayError={guestUnreachable}
           onClick={() => {}}
         />
       )}
@@ -309,7 +422,7 @@ export default function WidgetView({ onReset }) {
         <>
           <div className="widget-divider" />
           <div className="reconnect-banner no-drag">
-            <p className="reconnect-msg">Team relay offline. Auto-reconnecting… or paste an invite link to retry.</p>
+            <p className="reconnect-msg">Can't reach the relay. Retrying automatically… To reconnect faster, ask your host for a fresh invite link (or a local invite link if you're on the same network).</p>
             <input
               className="reconnect-input"
               type="text"

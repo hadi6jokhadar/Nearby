@@ -6,9 +6,24 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
 
 /* ─── Loading screen ────────────────────────────────────────────────────────── */
 .loading-screen {
-  width: 100vw;
-  height: 100vh;
-  background: transparent;
+  width: 160px;
+  min-height: 200px;
+  margin: 0 auto;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(0,0,0,0.08);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+@media (prefers-color-scheme: dark) {
+  .loading-screen {
+    background: rgba(28,28,30,0.92);
+    border-color: rgba(255,255,255,0.08);
+  }
 }
 
 /* ─── Setup view ────────────────────────────────────────────────────────────── */
@@ -155,15 +170,17 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
   border: 1px solid rgba(0,0,0,0.08);
   box-shadow: 0 4px 24px rgba(0,0,0,0.12);
 
-  /* Make the whole widget draggable except interactive elements */
-  -webkit-app-region: drag;
+  /* Dragging is handled via IPC (no -webkit-app-region: drag) so that right-click
+     is a plain Chromium client-area event on every platform. */
   user-select: none;
+  cursor: default;
 }
 @media (prefers-color-scheme: dark) {
   .widget-container {
     background: rgba(28,28,30,0.92);
     border-color: rgba(255,255,255,0.08);
     box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+    color: #f0f0f0;
   }
 }
 
@@ -189,8 +206,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
   justify-content: center;
   transition: border-color 0.4s ease, box-shadow 0.4s ease;
 }
-.peer-ring.online  { border-color: #22c55e; }
-.peer-ring.offline { border-color: #9ca3af; }
+.peer-ring.online       { border-color: #22c55e; }
+.peer-ring.offline      { border-color: #9ca3af; }
+.peer-ring.relay-error  { border-color: #ef4444; box-shadow: 0 0 0 3px rgba(239,68,68,0.18); }
 .peer-ring.paired  {
   border-color: #22c55e;
   box-shadow: 0 0 0 3px rgba(34,197,94,0.2);
@@ -523,6 +541,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
   cursor: pointer;
   color: inherit;
 }
+@media (prefers-color-scheme: dark) {
+  .confirm-no { border-color: rgba(255,255,255,0.18); }
+}
 
 /* ─── Relationship pill ─────────────────────────────────────────────────────── */
 .relationship-pill {
@@ -624,5 +645,139 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
   .update-btn.update-btn-ready:hover { background: rgba(169,164,245,0.2); border-color: rgba(169,164,245,0.65); }
 }
 
-/* Utility: prevent dragging on any interactive element */
-button, input, a, .no-drag { -webkit-app-region: no-drag; }
+/* ─── Compact widget ─────────────────────────────────────────────────────────── */
+.widget-container.compact {
+  min-height: unset;
+  padding: 8px 8px 6px;
+  gap: 2px;
+}
+
+/* One row = one pair OR one standalone orb */
+.compact-pair-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 4px;
+  padding: 2px 4px;
+}
+
+/* Colored connector line between paired orbs */
+.compact-connector {
+  flex: 1;
+  height: 2px;
+  border-radius: 1px;
+  min-width: 8px;
+}
+.compact-connector.working_with { background: #22c55e; }
+.compact-connector.waiting_for  { background: #BA7517; }
+@media (prefers-color-scheme: dark) {
+  .compact-connector.working_with { background: #2dba8f; }
+  .compact-connector.waiting_for  { background: #d4a240; }
+}
+
+/* Small orb used in compact rows (no name label) */
+.compact-orb {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.compact-orb.online    { border-color: #22c55e; }
+.compact-orb.offline   { border-color: #9ca3af; }
+.compact-orb.relay-err { border-color: #ef4444; box-shadow: 0 0 0 2px rgba(239,68,68,0.2); }
+.compact-orb.compact-pulse { animation: pulse 1.8s ease-in-out infinite; }
+.compact-orb.clickable { cursor: pointer; }
+.compact-orb.clickable:hover { opacity: 0.82; }
+.compact-orb.selected  { outline: 2px solid rgba(127,119,221,0.6); outline-offset: 2px; }
+
+.compact-orb-inner {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--peer-color, #888780);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+/* Solo peers cluster — horizontal row of small orbs with no connector */
+.compact-solo-cluster {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  width: 100%;
+  padding: 2px 4px;
+}
+
+.compact-more {
+  font-size: 9px;
+  font-weight: 600;
+  color: #888;
+  min-width: 22px;
+  align-self: center;
+  text-align: center;
+}
+@media (prefers-color-scheme: dark) {
+  .compact-more { color: #aaa; }
+}
+
+/* Compact: inline action panel — appears when a peer orb is clicked */
+.compact-action-panel {
+  width: 100%;
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(0,0,0,0.07);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  animation: fadeIn 0.12s ease;
+}
+@media (prefers-color-scheme: dark) {
+  .compact-action-panel { border-top-color: rgba(255,255,255,0.08); }
+}
+.compact-action-name {
+  font-size: 9px;
+  font-weight: 600;
+  opacity: 0.55;
+  text-align: center;
+}
+.compact-action-btn {
+  width: 100%;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(0,0,0,0.1);
+  background: rgba(0,0,0,0.04);
+  color: inherit;
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.12s, border-color 0.12s;
+}
+.compact-action-btn:hover {
+  background: rgba(127,119,221,0.12);
+  border-color: rgba(127,119,221,0.35);
+}
+.compact-action-btn.active {
+  background: rgba(127,119,221,0.18);
+  border-color: rgba(127,119,221,0.5);
+  color: #7F77DD;
+}
+@media (prefers-color-scheme: dark) {
+  .compact-action-btn { border-color: rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); }
+  .compact-action-btn:hover { background: rgba(169,164,245,0.15); border-color: rgba(169,164,245,0.4); }
+  .compact-action-btn.active { background: rgba(169,164,245,0.2); border-color: rgba(169,164,245,0.55); color: #a9a4f5; }
+}
+
+/* Keep pointer cursor on interactive elements inside the draggable container */
+button, input, a { cursor: pointer; }
+input { cursor: text; }

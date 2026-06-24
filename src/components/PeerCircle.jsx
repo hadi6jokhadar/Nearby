@@ -2,13 +2,13 @@
 
 import React from 'react';
 
-export default function PeerCircle({ peer, isSelf, isPaired, relationship, onClick }) {
+export default function PeerCircle({ peer, isSelf, isPaired, relationship, relayError, onClick }) {
   const initial = (peer.name || '?')[0].toUpperCase();
   const online = peer.online !== false; // default true if field missing
 
   const ringClass = [
     'peer-ring',
-    online ? 'online' : 'offline',
+    online ? 'online' : (relayError ? 'relay-error' : 'offline'),
     isPaired ? 'paired' : '',
     isSelf && !online ? 'self-disconnected' : '',
   ].filter(Boolean).join(' ');

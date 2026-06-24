@@ -47,6 +47,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Let the renderer tell the main process to refresh the tray menu labels
   updateTray:   ()       => ipcRenderer.invoke('update-tray'),
 
+  // IPC-based window drag (renderer calls these instead of -webkit-app-region: drag)
+  windowDragStart: (x, y) => ipcRenderer.send('window-drag-start', x, y),
+  windowDragMove:  (x, y) => ipcRenderer.send('window-drag-move',  x, y),
+  windowDragEnd:   ()     => ipcRenderer.send('window-drag-end'),
+
+  // Widget view mode: 'normal' | 'compact'
+  getWidgetMode:        ()       => ipcRenderer.invoke('get-widget-mode'),
+  onWidgetModeChanged:  (cb)     => { const fn = (_, mode) => cb(mode); ipcRenderer.on('widget-mode-changed', fn); return fn; },
+  offWidgetModeChanged: (fn)     => ipcRenderer.removeListener('widget-mode-changed', fn),
+
   // Launch at system startup
   getLoginItem: ()         => ipcRenderer.invoke('get-login-item'),
   setLoginItem: (enable)   => ipcRenderer.invoke('set-login-item', enable),
