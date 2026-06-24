@@ -104,12 +104,14 @@ jobs:
           $sha512 = [Convert]::ToBase64String($hashBytes)
           $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
           $date = (Get-Date -Format "o")
+          # GitHub normalizes spaces to dots in release asset download URLs, so match that here
+          $urlName = $exe.Name.Replace(' ', '.')
           $yaml  = "version: $version`n"
           $yaml += "files:`n"
-          $yaml += "  - url: $($exe.Name)`n"
+          $yaml += "  - url: $urlName`n"
           $yaml += "    sha512: $sha512`n"
           $yaml += "    size: $($exe.Length)`n"
-          $yaml += "path: $($exe.Name)`n"
+          $yaml += "path: $urlName`n"
           $yaml += "sha512: $sha512`n"
           $yaml += "releaseDate: '$date'"
           [System.IO.File]::WriteAllText("release/signed/latest.yml", $yaml)
